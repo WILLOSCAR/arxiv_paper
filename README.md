@@ -1,6 +1,6 @@
 # arXiv Paper Bot - Your Personal AI Paper Assistant
 
-A personalized and **self-learning** AI assistant for arXiv papers. It not only automates your research paper feed but also continuously learns and adapts to your academic preferences based on daily feedback, enabling truly personalized content recommendations.
+A personalized and self-learning AI assistant for arXiv papers. It not only automates your research paper feed but also continuously learns and adapts to your academic preferences based on daily feedback, enabling truly personalized content recommendations.
 
 Say goodbye to manually browsing arXiv or filtering by keywords — let the knowledge that understands you the most come to you proactively.
 
