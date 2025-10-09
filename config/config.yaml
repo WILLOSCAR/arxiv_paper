@@ -1,0 +1,156 @@
+# arXiv Paper Bot Configuration
+
+# ===== arXiv Fetch Settings =====
+arxiv:
+  # arXiv categories to fetch (e.g., cs.CV, cs.AI, cs.LG, stat.ML)
+  categories:
+    - cs.CV
+    - cs.AI
+    - cs.LG
+
+  # Maximum number of papers to fetch per category per day
+  max_results: 50
+
+  # Sort order: "submittedDate" (newest first) or "lastUpdatedDate"
+  sort_by: submittedDate
+
+  # Sort order: "descending" or "ascending"
+  sort_order: descending
+
+  # Fetch mode - determines how papers are retrieved:
+  # - "category_only": Fetch by categories only (default)
+  # - "keyword_only": Fetch by keywords only (uses search_keywords below)
+  # - "combined": Fetch by categories AND keywords (most efficient ⭐ recommended)
+  # - "category_then_filter": Fetch all category papers, then filter locally
+  fetch_mode: combined
+
+  # Keywords for arXiv API search (used in keyword_only and combined modes)
+  # These keywords are used to query arXiv API directly for efficiency
+  search_keywords:
+    - transformer
+    - diffusion
+    - multimodal
+
+
+# ===== Filter Settings =====
+filter:
+  # Enable/disable keyword filtering
+  enabled: true
+
+  # Filter mode: "static" (keyword-based only) or "dynamic" (with preference model)
+  mode: static
+
+  # Keywords for filtering (case-insensitive)
+  keywords:
+    # High priority keywords (weight: 3.0)
+    high_priority:
+      - transformer
+      - diffusion
+      - multimodal
+      - vision-language
+      - self-supervised
+
+    # Medium priority keywords (weight: 2.0)
+    medium_priority:
+      - detection
+      - segmentation
+      - classification
+      - generation
+      - representation learning
+
+    # Low priority keywords (weight: 1.0)
+    low_priority:
+      - deep learning
+      - neural network
+      - machine learning
+
+  # Minimum score threshold to include a paper
+  min_score: 1.0
+
+  # Maximum number of papers to keep after filtering
+  top_k: 20
+
+
+# ===== Summarization Settings =====
+summarization:
+  # Enable/disable AI summarization
+  enabled: false
+
+  # Provider: "openai", "glm", "gemini"
+  provider: gemini
+
+  # API configuration (use environment variables for API keys)
+  api:
+    base_url: "https://api.aioec.tech/v1"
+    model: "gemini-2.5-flash"
+    api_key_env: "ARXIV_API_KEY"  # Read from environment variable
+
+  # Summary fields to generate
+  fields:
+    - one_sentence_highlight
+    - core_method
+    - key_contributions
+
+
+# ===== Storage Settings =====
+storage:
+  # Output format: "json", "csv", or "both"
+  format: both
+
+  # Output paths
+  json_path: data/papers.json
+  csv_path: data/papers.csv
+
+  # Append to existing files or overwrite
+  append_mode: true
+
+  # Include full abstract in output
+  include_abstract: true
+
+
+# ===== Logging Settings =====
+logging:
+  level: INFO  # DEBUG, INFO, WARNING, ERROR
+  log_file: logs/arxiv_bot.log
+  console_output: true
+
+
+# ===== Schedule Settings =====
+schedule:
+  # Enable automatic scheduling
+  enabled: false
+
+  # Run time (24-hour format, e.g., "09:00" for 9 AM)
+  run_time: "09:00"
+
+  # Timezone
+  timezone: Asia/Shanghai
+
+
+# ===== Personalization Settings (Reserved Slots) =====
+personalization:
+  # Enable personalization features (currently reserved for future implementation)
+  enabled: false  # 🔲 Reserved slot - not yet implemented
+
+  # User feedback collection
+  feedback:
+    enabled: true  # Feedback collection is available via feedback.py CLI
+    feedback_dir: data/feedback
+    auto_save: true
+
+  # Vector similarity ranking (Slot 1 - Reserved)
+  vector_ranking:
+    enabled: false  # 🔲 Reserved slot - requires sentence-transformers
+    model: allenai/specter  # SPECTER model for scientific papers
+    weight: 0.4  # Personalization weight: personalized_score = keyword * 0.6 + similarity * 0.4
+    vector_db: chromadb  # Vector database: chromadb or faiss
+
+  # Agent-based intent recognition (Slot 2 - Reserved)
+  agent:
+    enabled: false  # 🔲 Reserved slot - requires LLM API
+    provider: openai  # LLM provider: openai, gemini, local
+    model: gpt-4o-mini
+    features:
+      - intent_recognition      # Analyze user reading patterns
+      - dynamic_keywords        # Generate new keywords based on behavior
+      - recommendation_explain  # Explain why papers are recommended

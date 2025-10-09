@@ -1,0 +1,28 @@
+# arXiv Paper Bot - Python Dependencies
+
+# Core dependencies
+arxiv>=2.1.0                 # Official arXiv API client
+PyYAML>=6.0                  # YAML configuration parsing
+openai>=1.0.0                # OpenAI-compatible API client (for LLM summarization)
+
+# Data handling
+python-dateutil>=2.8.2       # Date parsing utilities
+numpy>=1.24.0                # For numerical operations (used in personalization slots)
+
+# Optional: For scheduling
+# schedule>=1.2.0            # Task scheduling (uncomment if needed)
+# APScheduler>=3.10.0        # Advanced scheduling (alternative)
+
+# Optional: Personalization features (Phase 2 - Reserved slots)
+# These dependencies are for future implementation of vector similarity ranking
+# Uncomment when implementing Phase 2 personalization features:
+# sentence-transformers>=2.0.0  # Scientific paper embeddings (SPECTER, SciBERT)
+# chromadb>=0.4.0              # Vector database for similarity search
+# faiss-cpu>=1.7.0             # Alternative: Facebook AI Similarity Search
+# torch>=2.0.0                 # Required by sentence-transformers
+
+# Development dependencies (optional)
+# pytest>=7.4.0              # Testing framework
+# black>=23.0.0              # Code formatting
+# flake8>=6.1.0              # Linting
+# mypy>=1.5.0                # Type checking
