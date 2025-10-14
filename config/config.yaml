@@ -154,3 +154,23 @@ personalization:
       - intent_recognition      # Analyze user reading patterns
       - dynamic_keywords        # Generate new keywords based on behavior
       - recommendation_explain  # Explain why papers are recommended
+
+
+# ===== Notification Settings =====
+notification:
+  enabled: false            # 是否启用推送
+  provider: feishu          # 可选: feishu / telegram / wechat
+  top_k: 5                  # 推送的论文条数
+
+  feishu:
+    webhook_url: ""         # 飞书群机器人 Webhook
+    secret: ""             # 如果开启签名校验,填写密钥
+
+  telegram:
+    bot_token: ""          # Telegram Bot Token
+    chat_id: ""            # 目标 chat_id
+
+  wechat:
+    app_id: ""             # 微信公众号 APP ID
+    app_secret: ""        # 微信公众号 APP Secret
+    open_id: ""           # 接收者 OpenID (需先关注公众号)

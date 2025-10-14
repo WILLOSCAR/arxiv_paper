@@ -37,6 +37,7 @@ tests/
 ├── test_models.py      # Tests for data models (Paper, Config classes)
 ├── test_filter.py      # Tests for keyword filtering and ranking
 ├── test_storage.py     # Tests for JSON/CSV storage
+├── test_notifier.py    # Tests for notification push logic
 └── fixtures/           # Test data (if needed)
 ```
 
@@ -62,6 +63,11 @@ tests/
 - Append mode functionality
 - Duplicate removal
 - File creation in non-existent directories
+
+### `test_notifier.py`
+- Message formatting utility
+- Builder validation for各渠道配置
+- 飞书/Telegram/微信公众号推送调用（通过 `requests` mock）
 
 ## ✅ Expected Results
 

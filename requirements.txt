@@ -4,6 +4,7 @@
 arxiv>=2.1.0                 # Official arXiv API client
 PyYAML>=6.0                  # YAML configuration parsing
 openai>=1.0.0                # OpenAI-compatible API client (for LLM summarization)
+requests>=2.31.0            # HTTP 调用,用于消息推送
 
 # Data handling
 python-dateutil>=2.8.2       # Date parsing utilities

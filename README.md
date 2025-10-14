@@ -2,9 +2,6 @@
 
 > 从每天500+篇arXiv论文中，自动筛选出你最感兴趣的5-10篇
 
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-
 **快速导航**: [快速开始](#快速开始) | [使用流程](#使用流程) | [完整文档](DOCS.md)
 
 ---
@@ -15,6 +12,7 @@
 - **🔍 多模式抓取**: 支持4种抓取模式，combined模式效率提升80%
 - **⚖️ 智能评分**: 多级关键词权重系统（high: 3.0, medium: 2.0, low: 1.0）
 - **👍 反馈学习**: 完整的Like/Dislike收集系统，持续优化推荐
+- **📨 多渠道推送**: 支持飞书、Telegram、微信公众号自动推送精选摘要
 - **🔌 预留扩展**: 向量相似度和Agent意图识别接口已就绪
 - **📊 双格式存储**: JSON（程序化）+ CSV（Excel）同时输出
 
@@ -51,6 +49,14 @@ filter:
     medium_priority: [detection]    # 权重2.0
   min_score: 1.0
   top_k: 20
+
+notification:
+  enabled: true
+  provider: feishu
+  top_k: 5
+  feishu:
+    webhook_url: https://open.feishu.cn/xxx
+    secret: your-secret-if-enabled
 ```
 
 ### 运行（1分钟）
@@ -65,10 +71,11 @@ cat data/papers.json | jq '.[0:3]'
 
 **输出示例：**
 ```
-[1/4] Fetching papers from arXiv... ✓ Fetched 85 papers
-[2/4] Filtering and ranking...      ✓ Filtered to 18 papers
-[3/4] Generating summaries...       ✓ Skipped
-[4/4] Saving results...             ✓ Saved 18 papers
+[1/5] Fetching papers from arXiv... ✓ Fetched 85 papers
+[2/5] Filtering and ranking...      ✓ Filtered to 18 papers
+[3/5] Generating summaries...       ✓ Skipped
+[4/5] Saving results...             ✓ Saved 18 papers
+[5/5] Sending notifications...      ✓ Sent via Feishu
 
 Top 5 Papers:
 1. Artificial Hippocampus Networks... (Score: 6.0)
@@ -83,7 +90,7 @@ Top 5 Papers:
 ### 日常工作流（每天5分钟）
 
 ```
-配置 → 抓取 → 查看 → 反馈 → 优化
+配置 → 抓取 → 查看 → 反馈 → 推送 → 优化
 ```
 
 #### 1. 抓取论文
@@ -124,6 +131,10 @@ python feedback.py stats              # 📊 查看统计
 
 根据统计结果调整 `config.yaml` 中的关键词权重
 
+#### 5. 多渠道推送（可选）
+
+在 `notification` 模块填写飞书 / Telegram / 微信公众号的凭据，运行完成后自动推送 Top N 推荐摘要。
+
 ---
 
 ## 🏗️ 系统架构
@@ -139,7 +150,7 @@ python feedback.py stats              # 📊 查看统计
 50-100篇候选
     ↓
 【Level 2】本地关键词评分
-  → 多级权重 + Top-K
+ → 多级权重 + Top-K
     ↓
 20篇高质量论文
     ↓
@@ -148,6 +159,8 @@ python feedback.py stats              # 📊 查看统计
 【槽位2】Agent意图 🔲 预留
     ↓
 5-10篇个性化推荐
+    ↓
+📨 多渠道推送（可选）
     ↓
 👍👎 反馈循环
 ```
@@ -174,13 +187,14 @@ arxiv_paper/
 │   ├── fetcher.py           #   arXiv抓取
 │   ├── filter.py            #   关键词过滤
 │   ├── storage.py           #   JSON/CSV存储
+│   ├── notifier.py          #   多渠道推送
 │   ├── feedback.py          #   反馈收集 ⭐
 │   └── personalization.py   #   个性化（预留）🔲
 ├── data/                    # ✅ 数据输出
 │   ├── papers.json
 │   ├── papers.csv
 │   └── feedback/            #   反馈数据 ⭐
-├── tests/                   # ✅ 单元测试（19个全通过）
+├── tests/                   # ✅ 单元测试（27个全通过）
 └── DOCS.md                  # 📖 完整文档
 ```
 

@@ -7,6 +7,7 @@ from .filter import PaperFilter, DynamicFilter
 from .models import Paper, FetchConfig, FilterConfig
 from .storage import PaperStorage
 from .summarizer import PaperSummarizer, SummarizerConfig
+from .notifier import NotificationConfig, build_notifier
 
 # Personalization modules (reserved slots for future implementation)
 from .feedback import FeedbackCollector
@@ -22,6 +23,8 @@ __all__ = [
     "PaperStorage",
     "PaperSummarizer",
     "SummarizerConfig",
+    "NotificationConfig",
+    "build_notifier",
     # Personalization
     "FeedbackCollector",
     "PersonalizedRanker",

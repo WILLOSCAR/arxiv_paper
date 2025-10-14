@@ -5,7 +5,7 @@
 这是一个**个性化 arXiv 论文推荐系统**，采用**漏斗筛选架构**，从每天500+篇论文中筛选出你最感兴趣的5-10篇。
 
 ### 核心特点
-- ✅ **当前可用**：关键词过滤 + 用户反馈收集
+- ✅ **当前可用**：关键词过滤 + 用户反馈收集 + 多渠道推送
 - 🔲 **预留槽位**：向量相似度排序 + Agent意图识别（待实现）
 
 ---
@@ -79,6 +79,21 @@ filter:
   min_score: 1.0       # 最低分数阈值
   top_k: 20            # 保留前K篇
 
+notification:          # 推送设置（可选）
+  enabled: false
+  provider: feishu     # feishu / telegram / wechat
+  top_k: 5
+  feishu:
+    webhook_url: ""
+    secret: ""
+  telegram:
+    bot_token: ""
+    chat_id: ""
+  wechat:
+    app_id: ""
+    app_secret: ""
+    open_id: ""
+
 personalization:       # 个性化设置（预留）
   enabled: false       # 🔲 暂未实现
   feedback:
@@ -102,22 +117,25 @@ python main.py --test
 
 **执行过程：**
 ```
-[1/4] 从 arXiv 抓取论文
+[1/5] 从 arXiv 抓取论文
   ├─ Mode: combined (cs.CV + keywords)
   ├─ Mode: combined (cs.AI + keywords)
   └─ 去重 → 输出: ~50-100篇
 
-[2/4] 本地关键词过滤与评分
+[2/5] 本地关键词过滤与评分
   ├─ 标题+摘要关键词匹配
   ├─ 多级权重计算分数
   └─ Top-K 保留 → 输出: ~20篇
 
-[3/4] AI总结生成（可选）
+[3/5] AI总结生成（可选）
   └─ 默认关闭，需配置LLM API
 
-[4/4] 保存结果
+[4/5] 保存结果
   ├─ data/papers.json (详细信息)
   └─ data/papers.csv  (表格格式)
+
+[5/5] 多渠道推送（可选）
+  └─ 根据 notification 配置自动推送 Top N 推荐
 ```
 
 **输出示例：**

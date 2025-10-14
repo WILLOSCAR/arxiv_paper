@@ -19,6 +19,8 @@ from src import (
     PaperStorage,
     PaperSummarizer,
     SummarizerConfig,
+    NotificationConfig,
+    build_notifier,
 )
 
 
@@ -95,7 +97,7 @@ def main():
 
     try:
         # Step 1: Fetch papers from arXiv
-        logger.info("\n[1/4] Fetching papers from arXiv...")
+        logger.info("\n[1/5] Fetching papers from arXiv...")
 
         arxiv_config = config["arxiv"]
         fetch_config = FetchConfig(
@@ -117,7 +119,7 @@ def main():
             return
 
         # Step 2: Filter and rank papers
-        logger.info("\n[2/4] Filtering and ranking papers...")
+        logger.info("\n[2/5] Filtering and ranking papers...")
 
         filter_config_dict = config["filter"]
         filter_config = FilterConfig(
@@ -144,7 +146,7 @@ def main():
                 logger.info(f"    - {kw}: {count} papers")
 
         # Step 3: Generate summaries (optional)
-        logger.info("\n[3/4] Generating summaries...")
+        logger.info("\n[3/5] Generating summaries...")
 
         summarizer_config_dict = config.get("summarization", {})
         api_config = summarizer_config_dict.get("api", {})
@@ -167,7 +169,7 @@ def main():
             logger.info("✓ Summarization disabled (skipped)")
 
         # Step 4: Save results
-        logger.info("\n[4/4] Saving results...")
+        logger.info("\n[4/5] Saving results...")
 
         storage_config = config["storage"]
         storage = PaperStorage(
@@ -182,6 +184,29 @@ def main():
         )
 
         logger.info(f"✓ Saved {len(filtered_papers)} papers")
+
+        # Step 5: Push notifications (optional)
+        notification_dict = config.get("notification", {})
+        notification_config = NotificationConfig(
+            enabled=notification_dict.get("enabled", False),
+            provider=notification_dict.get("provider", ""),
+            top_k=notification_dict.get("top_k", 5),
+            feishu_webhook=notification_dict.get("feishu", {}).get("webhook_url"),
+            feishu_secret=notification_dict.get("feishu", {}).get("secret"),
+            telegram_bot_token=notification_dict.get("telegram", {}).get("bot_token"),
+            telegram_chat_id=notification_dict.get("telegram", {}).get("chat_id"),
+            wechat_app_id=notification_dict.get("wechat", {}).get("app_id"),
+            wechat_app_secret=notification_dict.get("wechat", {}).get("app_secret"),
+            wechat_open_id=notification_dict.get("wechat", {}).get("open_id"),
+        )
+
+        try:
+            notifier = build_notifier(notification_config)
+            if notifier:
+                logger.info("\n[5/5] Sending notifications via %s...", notifier.provider_name)
+                notifier.send(filtered_papers)
+        except Exception as notify_error:
+            logger.error("通知发送失败: %s", notify_error, exc_info=True)
 
         # Print summary
         logger.info("\n" + "=" * 60)
