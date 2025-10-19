@@ -24,6 +24,9 @@ arxiv:
   # - "category_then_filter": Fetch all category papers, then filter locally
   fetch_mode: combined
 
+  # 当使用关键词抓取时,是否额外拉取完整分类(用于本地二次过滤)
+  fetch_full_categories: false
+
   # Keywords for arXiv API search (used in keyword_only and combined modes)
   # These keywords are used to query arXiv API directly for efficiency
   search_keywords:

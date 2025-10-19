@@ -55,6 +55,8 @@ arxiv:
     # combined          : 分类+关键词（最高效 ⭐）
     # category_then_filter: 先抓全部再本地过滤
 
+  fetch_full_categories: false # 关键词抓取时是否再拉分类全量兜底
+
   search_keywords:     # API级关键词（用于combined模式）
     - transformer
     - diffusion
@@ -120,6 +122,7 @@ python main.py --test
 [1/5] 从 arXiv 抓取论文
   ├─ Mode: combined (cs.CV + keywords)
   ├─ Mode: combined (cs.AI + keywords)
+  ├─ (可选) fetch_full_categories=True 时额外拉取分类全量数据
   └─ 去重 → 输出: ~50-100篇
 
 [2/5] 本地关键词过滤与评分

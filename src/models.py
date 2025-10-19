@@ -29,6 +29,11 @@ class Paper:
     published: datetime
     updated: datetime
 
+    # Optional arXiv metadata
+    comment: Optional[str] = None
+    journal_ref: Optional[str] = None
+    doi: Optional[str] = None
+
     # Filtering and ranking
     score: float = 0.0
     matched_keywords: List[str] = field(default_factory=list)
@@ -59,6 +64,9 @@ class Paper:
             "entry_url": self.entry_url,
             "published": self.published.isoformat(),
             "updated": self.updated.isoformat(),
+            "comment": self.comment,
+            "journal_ref": self.journal_ref,
+            "doi": self.doi,
             "score": self.score,
             "matched_keywords": self.matched_keywords,
             "summary": self.summary,
@@ -78,6 +86,9 @@ class Paper:
             "entry_url": self.entry_url,
             "published": self.published.isoformat(),
             "updated": self.updated.isoformat(),
+            "comment": self.comment or "",
+            "journal_ref": self.journal_ref or "",
+            "doi": self.doi or "",
             "score": self.score,
             "matched_keywords": ", ".join(self.matched_keywords),
             "fetched_at": self.fetched_at.isoformat(),
@@ -105,6 +116,9 @@ class Paper:
             entry_url=result.entry_id,
             published=result.published,
             updated=result.updated,
+            comment=getattr(result, "comment", None),
+            journal_ref=getattr(result, "journal_ref", None),
+            doi=getattr(result, "doi", None),
         )
 
 
@@ -126,6 +140,9 @@ class FetchConfig:
 
     # Keywords for arXiv API search (used in keyword_only and combined modes)
     search_keywords: List[str] = field(default_factory=list)
+
+    # Whether to fetch full category results in addition to keyword queries
+    fetch_full_categories: bool = False
 
 
 @dataclass

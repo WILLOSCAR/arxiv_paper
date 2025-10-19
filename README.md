@@ -39,6 +39,7 @@ pip install -r requirements.txt
 arxiv:
   categories: [cs.CV, cs.AI]       # 你关注的领域
   fetch_mode: combined              # 推荐：最高效模式
+  fetch_full_categories: false      # 需要兜底拉全量时改为 true
   search_keywords:                  # API级关键词
     - transformer
     - diffusion

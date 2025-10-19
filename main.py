@@ -107,6 +107,7 @@ def main():
             sort_order=arxiv_config.get("sort_order", "descending"),
             fetch_mode=arxiv_config.get("fetch_mode", "category_only"),
             search_keywords=arxiv_config.get("search_keywords", []),
+            fetch_full_categories=arxiv_config.get("fetch_full_categories", False),
         )
 
         fetcher = ArxivFetcher(fetch_config)

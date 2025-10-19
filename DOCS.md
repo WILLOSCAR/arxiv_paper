@@ -81,6 +81,7 @@ python main.py --days 7
 ```
 [1/5] 从 arXiv 抓取论文
   ├─ Mode: combined (cs.AI + keywords)
+  ├─ (可选) fetch_full_categories=True 时额外拉取分类全量数据
   └─ 输出: ~50-100篇
 
 [2/5] 本地关键词过滤与评分
@@ -338,6 +339,9 @@ arxiv:
 
   # 抓取模式（推荐 combined）
   fetch_mode: combined
+
+  # 当使用关键词抓取时是否额外拉取完整分类供本地过滤
+  fetch_full_categories: false
 
   # API级关键词（用于combined模式）
   search_keywords:

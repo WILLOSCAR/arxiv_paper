@@ -38,6 +38,8 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(data["arxiv_id"], "2501.12345")
         self.assertEqual(data["title"], "Test Paper on Transformers")
         self.assertIn("published", data)
+        self.assertIn("comment", data)
+        self.assertIsNone(data["comment"])
 
     def test_to_csv_row(self):
         """Test conversion to CSV row."""
@@ -48,6 +50,7 @@ class TestPaper(unittest.TestCase):
         self.assertEqual(row["authors"], "Alice Smith; Bob Jones")
         # Categories should be comma-separated
         self.assertEqual(row["categories"], "cs.AI, cs.LG")
+        self.assertEqual(row["comment"], "")
 
 
 class TestFetchConfig(unittest.TestCase):
@@ -62,6 +65,7 @@ class TestFetchConfig(unittest.TestCase):
         self.assertEqual(config.fetch_mode, "category_only")
         self.assertEqual(config.search_keywords, [])
         self.assertEqual(config.sort_by, "submittedDate")
+        self.assertFalse(config.fetch_full_categories)
 
     def test_fetch_config_combined_mode(self):
         """Test FetchConfig with combined mode."""

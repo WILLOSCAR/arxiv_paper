@@ -36,18 +36,33 @@ class ArxivFetcher:
         """
         mode = self.config.fetch_mode
 
+        primary_papers: List[Paper]
+
         if mode == "category_only":
-            return self._fetch_by_categories(days)
+            primary_papers = self._fetch_by_categories(days)
         elif mode == "keyword_only":
-            return self._fetch_by_keywords(days)
+            primary_papers = self._fetch_by_keywords(days)
         elif mode == "combined":
-            return self._fetch_combined(days)
+            primary_papers = self._fetch_combined(days)
         elif mode == "category_then_filter":
-            # This mode fetches by category and relies on filter module
-            return self._fetch_by_categories(days)
+            primary_papers = self._fetch_by_categories(days)
         else:
             logger.warning(f"Unknown fetch_mode '{mode}', using category_only")
-            return self._fetch_by_categories(days)
+            primary_papers = self._fetch_by_categories(days)
+
+        if (
+            self.config.fetch_full_categories
+            and mode != "category_only"
+        ):
+            logger.info(
+                "fetch_full_categories=True, fetching full category dumps for %s",
+                ", ".join(self.config.categories),
+            )
+            category_papers = self._fetch_by_categories(days)
+            primary_papers.extend(category_papers)
+            primary_papers = self._deduplicate_papers(primary_papers)
+
+        return primary_papers
 
     def _fetch_by_categories(self, days: int) -> List[Paper]:
         """
@@ -286,7 +301,7 @@ class ArxivFetcher:
             sort_by=arxiv.SortCriterion.SubmittedDate,
             sort_order=arxiv.SortOrder.Descending,
         )
-
+    
         papers = []
         for result in self.client.results(search):
             paper = Paper.from_arxiv_result(result)
