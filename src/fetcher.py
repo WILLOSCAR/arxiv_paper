@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 import arxiv
 
