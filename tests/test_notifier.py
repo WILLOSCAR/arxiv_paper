@@ -68,17 +68,39 @@ class TestFeishuNotifier(TestCase):
     def test_feishu_send_invokes_http(self, mock_post):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}  # 飞书成功响应
         mock_post.return_value = mock_response
 
         config = NotificationConfig(
             enabled=True,
             provider="feishu",
             feishu_webhook="https://example.com/webhook",
+            use_rich_format=True,  # 测试消息卡片格式
         )
         notifier = build_notifier(config)
         notifier.send([_sample_paper()])
 
         self.assertTrue(mock_post.called)
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["msg_type"], "interactive")  # 消息卡片格式
+
+    @patch("src.notifier.requests.post")
+    def test_feishu_send_plain_text(self, mock_post):
+        """测试飞书纯文本格式."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}
+        mock_post.return_value = mock_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="feishu",
+            feishu_webhook="https://example.com/webhook",
+            use_rich_format=False,  # 纯文本格式
+        )
+        notifier = build_notifier(config)
+        notifier.send([_sample_paper()])
+
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(payload["msg_type"], "text")
 
@@ -88,6 +110,7 @@ class TestTelegramNotifier(TestCase):
     def test_telegram_send_invokes_http(self, mock_post):
         mock_response = MagicMock()
         mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"ok": True}  # Telegram 成功响应
         mock_post.return_value = mock_response
 
         config = NotificationConfig(
@@ -95,12 +118,36 @@ class TestTelegramNotifier(TestCase):
             provider="telegram",
             telegram_bot_token="bot-token",
             telegram_chat_id="chat-id",
+            use_rich_format=True,  # 测试 Markdown 格式
         )
         notifier = build_notifier(config)
         notifier.send([_sample_paper()])
 
         mock_post.assert_called_once()
         self.assertIn("sendMessage", mock_post.call_args[0][0])
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["parse_mode"], "MarkdownV2")
+
+    @patch("src.notifier.requests.post")
+    def test_telegram_send_plain_text(self, mock_post):
+        """测试 Telegram 纯文本格式."""
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"ok": True}
+        mock_post.return_value = mock_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="telegram",
+            telegram_bot_token="bot-token",
+            telegram_chat_id="chat-id",
+            use_rich_format=False,  # 纯文本格式
+        )
+        notifier = build_notifier(config)
+        notifier.send([_sample_paper()])
+
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertNotIn("parse_mode", payload)
 
 
 class TestWeChatNotifier(TestCase):
@@ -123,9 +170,41 @@ class TestWeChatNotifier(TestCase):
             wechat_app_id="app",
             wechat_app_secret="secret",
             wechat_open_id="openid",
+            use_rich_format=True,  # 测试图文消息格式
         )
         notifier = build_notifier(config)
         notifier.send([_sample_paper()])
 
         mock_get.assert_called_once()
         mock_post.assert_called_once()
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["msgtype"], "news")  # 图文消息格式
+        self.assertIn("articles", payload["news"])
+
+    @patch("src.notifier.requests.post")
+    @patch("src.notifier.requests.get")
+    def test_wechat_send_plain_text(self, mock_get, mock_post):
+        """测试微信纯文本格式."""
+        mock_get_response = MagicMock()
+        mock_get_response.raise_for_status.return_value = None
+        mock_get_response.json.return_value = {"access_token": "token"}
+        mock_get.return_value = mock_get_response
+
+        mock_post_response = MagicMock()
+        mock_post_response.raise_for_status.return_value = None
+        mock_post_response.json.return_value = {"errcode": 0}
+        mock_post.return_value = mock_post_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="wechat",
+            wechat_app_id="app",
+            wechat_app_secret="secret",
+            wechat_open_id="openid",
+            use_rich_format=False,  # 纯文本格式
+        )
+        notifier = build_notifier(config)
+        notifier.send([_sample_paper()])
+
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["msgtype"], "text")

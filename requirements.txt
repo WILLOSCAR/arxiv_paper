@@ -10,13 +10,17 @@ requests>=2.31.0            # HTTP 调用,用于消息推送
 python-dateutil>=2.8.2       # Date parsing utilities
 numpy>=1.24.0                # For numerical operations (used in personalization slots)
 
+# LangGraph Agent Pipeline (for filter.mode: agent)
+langgraph>=0.2.0             # LangGraph for agent orchestration
+langchain-openai>=0.2.0      # OpenAI integration for LangChain
+langchain-core>=0.3.0        # LangChain core components
+
 # Optional: For scheduling
 # schedule>=1.2.0            # Task scheduling (uncomment if needed)
 # APScheduler>=3.10.0        # Advanced scheduling (alternative)
 
-# Optional: Personalization features (Phase 2 - Reserved slots)
-# These dependencies are for future implementation of vector similarity ranking
-# Uncomment when implementing Phase 2 personalization features:
+# Optional: Vector similarity features (not used in pure LLM mode)
+# Uncomment if you want to add vector-based ranking:
 # sentence-transformers>=2.0.0  # Scientific paper embeddings (SPECTER, SciBERT)
 # chromadb>=0.4.0              # Vector database for similarity search
 # faiss-cpu>=1.7.0             # Alternative: Facebook AI Similarity Search

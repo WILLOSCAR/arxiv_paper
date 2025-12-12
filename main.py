@@ -21,6 +21,9 @@ from src import (
     SummarizerConfig,
     NotificationConfig,
     build_notifier,
+    # Integration layer
+    Orchestrator,
+    OrchestratorConfig,
 )
 
 
@@ -122,22 +125,20 @@ def main():
         # Step 2: Filter and rank papers
         logger.info("\n[2/5] Filtering and ranking papers...")
 
-        filter_config_dict = config["filter"]
-        filter_config = FilterConfig(
-            enabled=filter_config_dict.get("enabled", True),
-            mode=filter_config_dict.get("mode", "static"),
-            keywords=filter_config_dict.get("keywords", {}),
-            min_score=filter_config_dict.get("min_score", 0.0),
-            top_k=filter_config_dict.get("top_k", 20),
-        )
+        # Use Orchestrator for strategy-based filtering
+        # Supports: "static" (keyword-only), "dynamic", "agent" (LangGraph)
+        orchestrator_config = OrchestratorConfig.from_dict(config)
+        orchestrator = Orchestrator(orchestrator_config)
 
-        paper_filter = PaperFilter(filter_config)
-        filtered_papers = paper_filter.filter_and_rank(papers)
+        filter_mode = config.get("filter", {}).get("mode", "static")
+        logger.info(f"  Filter mode: {filter_mode}")
+
+        filtered_papers = orchestrator.process(papers)
 
         logger.info(f"✓ Filtered to {len(filtered_papers)} papers")
 
         # Show statistics
-        stats = paper_filter.get_statistics(filtered_papers)
+        stats = orchestrator.get_statistics(filtered_papers)
         logger.info(f"  Average score: {stats['avg_score']:.2f}")
         logger.info(f"  Score range: {stats['min_score']:.1f} - {stats['max_score']:.1f}")
 
@@ -199,6 +200,9 @@ def main():
             wechat_app_id=notification_dict.get("wechat", {}).get("app_id"),
             wechat_app_secret=notification_dict.get("wechat", {}).get("app_secret"),
             wechat_open_id=notification_dict.get("wechat", {}).get("open_id"),
+            # 增强选项
+            use_rich_format=notification_dict.get("use_rich_format", True),
+            include_abstract=notification_dict.get("include_abstract", False),
         )
 
         try:

@@ -40,8 +40,11 @@ filter:
   # Enable/disable keyword filtering
   enabled: true
 
-  # Filter mode: "static" (keyword-based only) or "dynamic" (with preference model)
-  mode: static
+  # Filter mode:
+  # - "static": Keyword-based only (default, no LLM needed)
+  # - "dynamic": With preference learning (placeholder)
+  # - "agent": LangGraph agent-enhanced filtering (requires OpenAI API)
+  mode: static  # Change to "agent" to enable LangGraph pipeline
 
   # Keywords for filtering (case-insensitive)
   keywords:
@@ -130,10 +133,10 @@ schedule:
   timezone: Asia/Shanghai
 
 
-# ===== Personalization Settings (Reserved Slots) =====
+# ===== Personalization Settings =====
 personalization:
-  # Enable personalization features (currently reserved for future implementation)
-  enabled: false  # 🔲 Reserved slot - not yet implemented
+  # Enable personalization features
+  enabled: false  # Set to true when using filter.mode: agent
 
   # User feedback collection
   feedback:
@@ -141,22 +144,66 @@ personalization:
     feedback_dir: data/feedback
     auto_save: true
 
-  # Vector similarity ranking (Slot 1 - Reserved)
+  # Vector similarity ranking (Reserved - not implemented in pure LLM mode)
   vector_ranking:
-    enabled: false  # 🔲 Reserved slot - requires sentence-transformers
-    model: allenai/specter  # SPECTER model for scientific papers
-    weight: 0.4  # Personalization weight: personalized_score = keyword * 0.6 + similarity * 0.4
-    vector_db: chromadb  # Vector database: chromadb or faiss
+    enabled: false
+    model: allenai/specter
+    weight: 0.4
+    vector_db: chromadb
 
-  # Agent-based intent recognition (Slot 2 - Reserved)
+  # LangGraph Agent configuration
   agent:
-    enabled: false  # 🔲 Reserved slot - requires LLM API
-    provider: openai  # LLM provider: openai, gemini, local
-    model: gpt-4o-mini
+    # Enable agent pipeline (required when filter.mode: agent)
+    enabled: false  # Set to true to enable LangGraph pipeline
+
+    # LLM Provider settings
+    # Supports: openai, openrouter
+    provider: openrouter
+
+    # Model configuration (dual-model support)
+    # - reasoning_model: For complex tasks requiring deep thinking (analysis, scoring)
+    # - simple_model: For simple tasks (formatting, extraction)
+    models:
+      reasoning: tngtech/deepseek-r1t2-chimera:free  # 需要深度思考的任务
+      simple: z-ai/glm-4.5-air:free                   # 简单任务
+
+    # Legacy single model (for backward compatibility)
+    model: z-ai/glm-4.5-air:free
+
+    temperature: 0.3
+
+    # API configuration
+    api:
+      # For OpenRouter:
+      base_url: "https://openrouter.ai/api/v1"
+      api_key_env: OPENROUTER_API_KEY
+      # For OpenAI (alternative):
+      # base_url: ""  # Leave empty for default OpenAI
+      # api_key_env: OPENAI_API_KEY
+      timeout: 60  # Increased for reasoning model
+
+    # Feature flags
     features:
-      - intent_recognition      # Analyze user reading patterns
-      - dynamic_keywords        # Generate new keywords based on behavior
-      - recommendation_explain  # Explain why papers are recommended
+      preference_analysis: true      # Analyze user reading patterns
+      dynamic_query_generation: true # Generate optimized search queries
+      result_validation: true        # Validate and re-rank results
+      recommendation_explain: true   # Generate recommendation explanations
+
+    # Cold-Start mode (NEW)
+    # Allows agent to work without historical feedback
+    cold_start:
+      enabled: true                  # Enable Cold-Start mode
+      use_config_keywords: true      # Use filter keywords as interest profile
+
+    # Flow control
+    max_iterations: 2               # Max re-ranking iterations
+    confidence_threshold: 0.7       # Below this triggers re-ranking
+    # min_feedback_count: 3         # Removed - not needed with Cold-Start
+
+    # Score weights (pure LLM mode)
+    weights:
+      keyword_score: 0.5           # Weight for keyword matching
+      agent_score: 0.5             # Weight for agent adjustments
 
 
 # ===== Notification Settings =====
@@ -164,6 +211,10 @@ notification:
   enabled: false            # 是否启用推送
   provider: feishu          # 可选: feishu / telegram / wechat
   top_k: 5                  # 推送的论文条数
+
+  # 增强选项
+  use_rich_format: true     # 使用富文本格式 (飞书卡片/Telegram Markdown)
+  include_abstract: false   # 是否包含论文摘要
 
   feishu:
     webhook_url: ""         # 飞书群机器人 Webhook
@@ -177,3 +228,19 @@ notification:
     app_id: ""             # 微信公众号 APP ID
     app_secret: ""        # 微信公众号 APP Secret
     open_id: ""           # 接收者 OpenID (需先关注公众号)
+
+
+# ===== Publisher Settings (公众号图文发布) =====
+publisher:
+  enabled: false            # 是否启用公众号发布
+  auto_publish: false       # 是否自动发布 (否则只保存到草稿箱)
+
+  # 文章设置
+  author: "arXiv Paper Bot" # 文章作者名
+  include_abstract: true    # 是否包含摘要
+  include_authors: true     # 是否包含论文作者
+
+  wechat:
+    app_id: ""              # 微信公众号 APP ID
+    app_secret: ""          # 微信公众号 APP Secret
+    default_cover: ""       # 默认封面图 media_id (需先上传)
