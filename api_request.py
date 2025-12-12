@@ -1,5 +1,7 @@
-import os
 import datetime
+import os
+from pathlib import Path
+
 import requests
 
 BASE_URL = "https://openrouter.ai/api/v1"
@@ -20,10 +22,33 @@ HEADERS = {
     "Origin": "https://openrouter.ai",
 }
 
-OPENROUTER_API_KEY = os.getenv(
-    "OPENROUTER_API_KEY",
-    "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",
-)
+
+def load_env_var(key: str, default: str = "") -> str:
+    """
+    Load a single environment variable from the current env or a local .env file.
+
+    Environment variables take precedence; the .env file (if present) is only used
+    as a fallback. Values are trimmed and stripped of surrounding quotes.
+    """
+    if key in os.environ and os.environ[key]:
+        return os.environ[key]
+
+    env_path = Path(__file__).with_name(".env")
+    if env_path.exists():
+        with env_path.open("r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line or line.startswith("#") or "=" not in line:
+                    continue
+
+                name, _, value = line.partition("=")
+                if name.strip() == key:
+                    return value.strip().strip('"').strip("'")
+
+    return default
+
+
+OPENROUTER_API_KEY = load_env_var("OPENROUTER_API_KEY", "")
 
 
 def fetch_frontend_models(sort: str | None = None) -> list[dict]:
