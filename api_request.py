@@ -7,6 +7,8 @@ import requests
 BASE_URL = "https://openrouter.ai/api/v1"
 MODELS_API_URL = f"{BASE_URL}/models"
 
+# openai/gpt-oss-120b:free
+
 # 浏览器 Models 页： https://openrouter.ai/models?q=free
 # 对应的前端 API（默认按调用量/Token 排序）：
 FRONTEND_FIND_API_URL = "https://openrouter.ai/api/frontend/models/find"
@@ -33,20 +35,25 @@ def load_env_var(key: str, default: str = "") -> str:
     if key in os.environ and os.environ[key]:
         return os.environ[key]
 
-    env_path = Path(__file__).with_name(".env")
-    if env_path.exists():
-        with env_path.open("r", encoding="utf-8") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
+    # 尝试多个可能的 .env 文件位置
+    possible_paths = [
+        Path(__file__).with_name(".env"),  # 同目录
+        Path(__file__).parent.parent / "env" / ".env",  # ../env/.env
+    ]
 
-                name, _, value = line.partition("=")
-                if name.strip() == key:
-                    return value.strip().strip('"').strip("'")
+    for env_path in possible_paths:
+        if env_path.exists():
+            with env_path.open("r", encoding="utf-8") as f:
+                for line in f:
+                    line = line.strip()
+                    if not line or line.startswith("#") or "=" not in line:
+                        continue
+
+                    name, _, value = line.partition("=")
+                    if name.strip() == key:
+                        return value.strip().strip('"').strip("'")
 
     return default
-
 
 OPENROUTER_API_KEY = load_env_var("OPENROUTER_API_KEY", "")
 
@@ -168,7 +175,7 @@ def get_free_models_hot(top_k: int = 20) -> list[dict]:
 
 
 
-def get_web_sorted_models(limit: int = 15, sort: str | None = None) -> list[dict]:
+def get_web_sorted_models(limit: int = 20, sort: str | None = None) -> list[dict]:
     """
     请求网页默认排序（调用量/Token）的免费模型列表，并打印前 N 个。
     可通过 sort 显式指定排序策略（如 popularity/usage），不指定则用网页默认。
