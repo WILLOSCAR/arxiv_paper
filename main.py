@@ -194,6 +194,7 @@ def main():
             provider=notification_dict.get("provider", ""),
             top_k=notification_dict.get("top_k", 5),
             feishu_webhook=notification_dict.get("feishu", {}).get("webhook_url"),
+            feishu_webhook_file=notification_dict.get("feishu", {}).get("webhook_file"),
             feishu_secret=notification_dict.get("feishu", {}).get("secret"),
             telegram_bot_token=notification_dict.get("telegram", {}).get("bot_token"),
             telegram_chat_id=notification_dict.get("telegram", {}).get("chat_id"),

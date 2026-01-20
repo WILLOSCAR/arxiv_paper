@@ -9,8 +9,31 @@ from langchain_core.prompts import ChatPromptTemplate
 
 from ..state import AgentState
 from ..prompts import VALIDATION_PROMPT
+from ...secrets import resolve_secret
 
 logger = logging.getLogger(__name__)
+
+
+def _resolve_api_key(config: dict) -> str | None:
+    """Resolve API key from config or configured environment variable."""
+    env_name = config.get("api_key_env") or "OPENAI_API_KEY"
+    return resolve_secret(
+        value=config.get("api_key"),
+        env=env_name,
+        file_path=config.get("api_key_file"),
+        required=False,
+        name="API key",
+    )
+
+
+def _default_headers(config: dict) -> dict[str, str] | None:
+    """Provider-specific headers (e.g., OpenRouter recommends these)."""
+    if (config.get("provider") or "").lower() != "openrouter":
+        return None
+    return {
+        "HTTP-Referer": "https://github.com/arxiv-paper-bot",
+        "X-Title": "arXiv Paper Bot",
+    }
 
 
 def validation_node(state: AgentState) -> dict[str, Any]:
@@ -30,7 +53,9 @@ def validation_node(state: AgentState) -> dict[str, Any]:
         Dictionary with validated_papers, explanations, and flow control
     """
     scored_papers = state.get("scored_papers", [])
-    interest_analysis = state.get("interest_analysis", {})
+    # Cold-Start graph doesn't populate interest_analysis; keep this robust.
+    interest_analysis = state.get("interest_analysis") or {}
+    interest_profile = state.get("interest_profile") or {}
     config = state.get("config", {})
     iteration = state.get("iteration", 0)
 
@@ -46,11 +71,19 @@ def validation_node(state: AgentState) -> dict[str, Any]:
 
     try:
         # Initialize LLM
+        api_key = _resolve_api_key(config)
+        if not api_key:
+            raise ValueError(
+                f"API key not found (env={config.get('api_key_env') or 'OPENAI_API_KEY'})"
+            )
+
         llm = ChatOpenAI(
-            model=config.get("model", "gpt-4o"),
+            model=config.get("simple_model") or config.get("model", "gpt-4o"),
             temperature=config.get("temperature", 0.2),  # Lower for consistency
-            api_key=config.get("api_key"),
-            base_url=config.get("base_url") if config.get("base_url") else None,
+            api_key=api_key,
+            base_url=config.get("base_url") or None,
+            timeout=config.get("timeout"),
+            default_headers=_default_headers(config),
         )
 
         # Prepare top papers for validation
@@ -60,18 +93,25 @@ def validation_node(state: AgentState) -> dict[str, Any]:
         # Create prompt
         prompt = ChatPromptTemplate.from_template(VALIDATION_PROMPT)
 
+        # Prefer analyzed interests, but fall back to profile keywords in Cold-Start.
+        main_interests = interest_analysis.get("main_interests") or []
+        if not main_interests and interest_profile:
+            main_interests = (
+                (interest_profile.get("main_interests") or [])
+                + (interest_profile.get("secondary_interests") or [])
+            )
+
+        disliked_topics = interest_analysis.get("disliked_topics") or []
+        if not disliked_topics and interest_profile:
+            disliked_topics = interest_profile.get("avoid_topics") or []
+
         # Invoke LLM
         chain = prompt | llm
         response = chain.invoke(
             {
                 "papers": papers_text,
-                "user_interests": ", ".join(
-                    interest_analysis.get("main_interests", [])
-                ),
-                "disliked_topics": ", ".join(
-                    interest_analysis.get("disliked_topics", [])
-                )
-                or "(None)",
+                "user_interests": ", ".join(main_interests),
+                "disliked_topics": ", ".join(disliked_topics) or "(None)",
             }
         )
 

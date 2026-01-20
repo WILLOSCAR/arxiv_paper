@@ -2,7 +2,8 @@
 
 from dataclasses import dataclass, field
 from typing import Dict, List, Optional
-import os
+
+from ..secrets import resolve_secret
 
 
 @dataclass
@@ -26,6 +27,7 @@ class AgentConfig:
     # API settings
     base_url: Optional[str] = None
     api_key: Optional[str] = None
+    api_key_file: Optional[str] = None
     api_key_env: str = "OPENROUTER_API_KEY"
     timeout: int = 60
 
@@ -56,16 +58,12 @@ class AgentConfig:
 
     def get_api_key(self) -> str:
         """Get API key from config or environment variable."""
-        if self.api_key:
-            return self.api_key
-
-        key = os.getenv(self.api_key_env)
-        if key:
-            return key
-
-        raise ValueError(
-            f"API key not found. Set {self.api_key_env} environment variable "
-            "or provide api_key in config."
+        return resolve_secret(
+            value=self.api_key,
+            env=self.api_key_env,
+            file_path=self.api_key_file,
+            required=True,
+            name="API key",
         )
 
     def get_model_for_task(self, task_type: str) -> str:
@@ -108,6 +106,7 @@ class AgentConfig:
             # API settings
             base_url=api_config.get("base_url"),
             api_key=api_config.get("api_key"),
+            api_key_file=api_config.get("api_key_file"),
             api_key_env=api_config.get("api_key_env", "OPENROUTER_API_KEY"),
             timeout=api_config.get("timeout", 60),
             preference_analysis=features_config.get("preference_analysis", True)
@@ -145,6 +144,7 @@ class AgentConfig:
             "simple_model": self.simple_model,
             "temperature": self.temperature,
             "base_url": self.base_url,
+            "api_key_file": self.api_key_file,
             "api_key_env": self.api_key_env,
             "timeout": self.timeout,
             "max_iterations": self.max_iterations,

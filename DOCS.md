@@ -17,6 +17,12 @@ pip install -r requirements.txt
 python main.py --config config/config.yaml --days 1
 cat data/papers.json | head
 ```
+
+## 日更 Topic 流水线（LangGraph, calendar-day）
+```bash
+python -m src.pipeline.run_daily --config config/config.yaml --day YYYY-MM-DD
+cat data/index/YYYY-MM-DD/daily_topics.json | head
+```
 可选：
 ```bash
 python feedback.py like <paper_id>

@@ -1,10 +1,11 @@
 """arXiv paper fetcher module using the official arxiv Python library."""
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from typing import List, Optional
 
 import arxiv
+from zoneinfo import ZoneInfo
 
 from .models import Paper, FetchConfig
 
@@ -63,6 +64,90 @@ class ArxivFetcher:
             primary_papers = self._deduplicate_papers(primary_papers)
 
         return primary_papers
+
+    def fetch_papers_for_calendar_day(
+        self,
+        day: date,
+        *,
+        timezone_name: str = "Asia/Shanghai",
+    ) -> List[Paper]:
+        """
+        Fetch papers that fall within a calendar day window in a given timezone.
+
+        This is useful for "today's papers" workflows where the window is a
+        calendar day (00:00-23:59) rather than a rolling N-day cutoff.
+
+        Notes:
+        - arXiv API returns timestamps in UTC. We convert the local calendar day
+          window to UTC and filter by result.published.
+        - This method uses category queries (cat:...) and relies on the search
+          being sorted by submittedDate descending so we can stop early once
+          results are older than the window start.
+
+        Args:
+            day: Local calendar day (date) in timezone_name
+            timezone_name: IANA timezone (default: Asia/Shanghai)
+
+        Returns:
+            List[Paper] within [day 00:00, next day 00:00) in the given timezone
+        """
+        try:
+            tz = ZoneInfo(timezone_name)
+        except Exception as exc:
+            raise ValueError(f"Invalid timezone: {timezone_name}") from exc
+
+        start_local = datetime.combine(day, time.min).replace(tzinfo=tz)
+        end_local = start_local + timedelta(days=1)
+        start_utc = start_local.astimezone(timezone.utc)
+        end_utc = end_local.astimezone(timezone.utc)
+
+        all_papers: List[Paper] = []
+
+        # Always fetch newest-first so we can break once we're older than window.
+        for category in self.config.categories:
+            logger.info(
+                "Fetching papers for %s in %s (UTC window %s -> %s)",
+                category,
+                timezone_name,
+                start_utc.isoformat(),
+                end_utc.isoformat(),
+            )
+
+            search = arxiv.Search(
+                query=f"cat:{category}",
+                max_results=self.config.max_results,
+                sort_by=arxiv.SortCriterion.SubmittedDate,
+                sort_order=arxiv.SortOrder.Descending,
+            )
+
+            saw_older = False
+            last_published: Optional[datetime] = None
+
+            for result in self.client.results(search):
+                last_published = result.published
+
+                # If running for a past day, we might see newer entries first.
+                if result.published >= end_utc:
+                    continue
+
+                if result.published < start_utc:
+                    saw_older = True
+                    break
+
+                all_papers.append(Paper.from_arxiv_result(result))
+
+            # If we never saw an older paper, max_results may be too small.
+            if not saw_older and last_published and last_published >= start_utc:
+                logger.warning(
+                    "Potential truncation for %s: max_results=%s may be too low to cover full day",
+                    category,
+                    self.config.max_results,
+                )
+
+        unique = self._deduplicate_papers(all_papers)
+        unique.sort(key=lambda p: p.published, reverse=True)
+        logger.info("Total unique papers in day window: %s", len(unique))
+        return unique
 
     def _fetch_by_categories(self, days: int) -> List[Paper]:
         """

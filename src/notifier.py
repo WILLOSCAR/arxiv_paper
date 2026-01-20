@@ -16,6 +16,7 @@ from typing import Iterable, List, Optional
 import requests
 
 from .models import Paper
+from .secrets import resolve_secret
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +33,7 @@ class NotificationConfig:
     provider: str = ""
     top_k: int = 5
     feishu_webhook: Optional[str] = None
+    feishu_webhook_file: Optional[str] = None
     feishu_secret: Optional[str] = None
     telegram_bot_token: Optional[str] = None
     telegram_chat_id: Optional[str] = None
@@ -53,10 +55,17 @@ def build_notifier(config: NotificationConfig):
         return None
 
     if provider == "feishu":
-        if not config.feishu_webhook:
-            raise NotificationError("Feishu 推送需要配置 webhook_url")
+        try:
+            webhook = resolve_secret(
+                value=config.feishu_webhook,
+                file_path=config.feishu_webhook_file,
+                required=True,
+                name="Feishu webhook_url",
+            )
+        except Exception as exc:
+            raise NotificationError("Feishu 推送需要配置 webhook_url 或 webhook_file") from exc
         return FeishuNotifier(
-            config.feishu_webhook,
+            webhook,
             config.feishu_secret,
             config.top_k,
             use_card=config.use_rich_format,

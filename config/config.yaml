@@ -177,6 +177,7 @@ personalization:
       # For OpenRouter:
       base_url: "https://openrouter.ai/api/v1"
       api_key_env: OPENROUTER_API_KEY
+      api_key_file: ""      # 可选：从文件读取 key（避免明文写入配置）
       # For OpenAI (alternative):
       # base_url: ""  # Leave empty for default OpenAI
       # api_key_env: OPENAI_API_KEY
@@ -218,6 +219,7 @@ notification:
 
   feishu:
     webhook_url: ""         # 飞书群机器人 Webhook
+    webhook_file: ""        # 或者从文件读取 webhook（避免明文写入配置）
     secret: ""             # 如果开启签名校验,填写密钥
 
   telegram:
@@ -244,3 +246,39 @@ publisher:
     app_id: ""              # 微信公众号 APP ID
     app_secret: ""          # 微信公众号 APP Secret
     default_cover: ""       # 默认封面图 media_id (需先上传)
+
+
+# ===== Daily Topic Pipeline (LangGraph, calendar-day) =====
+# Run with: python -m src.pipeline.run_daily --config config/config.yaml --day YYYY-MM-DD
+daily:
+  timezone: Asia/Shanghai
+
+  # Categories to fetch for the day window (calendar day in timezone)
+  categories:
+    - cs.AI
+    - cs.CV
+    - cs.IR
+    - cs.HC
+    - cs.CL
+    - cs.LG
+
+  # Max results per category (increase to reduce truncation risk)
+  max_results: 2000
+
+  # Optional rubric text override (defaults to built-in rubric in src/pipeline/topics.py)
+  # rubric_text: "..."
+
+  # Drop papers with relevance below this threshold (0-1)
+  relevance_threshold: 0.55
+
+  # Use LLM for routing+scoring (falls back to rule-only if key is missing)
+  llm_enabled: true
+
+  # LLM call scope: "all" | "ambiguous_only"
+  llm_scope: all
+
+  # Batch size for LLM calls
+  llm_batch_size: 1
+
+  # Also write raw/enriched/routed/scored JSONL files under data/index/<day>/
+  save_intermediates: true
