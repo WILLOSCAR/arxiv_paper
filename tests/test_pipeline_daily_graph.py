@@ -103,3 +103,67 @@ def test_llm_node_ambiguous_only_scope(monkeypatch):
     assert scored_by_id["p2"]["topic_id"] == 5
     assert scored_by_id["p2"]["relevance"] == 0.9
 
+
+def test_llm_vote_reruns_primary_on_disagreement(monkeypatch):
+    from src.pipeline import daily_graph
+
+    calls = {"deepseek": 0, "oss": 0}
+
+    def fake_build_llm(cfg, *, task):
+        model = cfg.get("reasoning_model") or cfg.get("model")
+
+        if model == "deepseek":
+            def deepseek(prompt_value):
+                calls["deepseek"] += 1
+                # 1st run returns topic 5, rerun returns topic 4 (simulate instability).
+                if calls["deepseek"] == 1:
+                    out = [{"paper_id": "p1", "topic_id": 5, "subtopic": "检索/IR/RAG（retrieval/rerank）", "relevance": 0.8, "keep": True, "reason": "ds1", "confidence": 0.8}]
+                else:
+                    out = [{"paper_id": "p1", "topic_id": 4, "subtopic": "长期记忆（episodic/semantic）", "relevance": 0.7, "keep": True, "reason": "ds2", "confidence": 0.7}]
+                return AIMessage(content=json.dumps(out))
+
+            return RunnableLambda(deepseek)
+
+        if model == "oss":
+            def oss(prompt_value):
+                calls["oss"] += 1
+                out = [{"paper_id": "p1", "topic_id": 3, "subtopic": "Agent 架构（单/多 agent、协作）", "relevance": 0.6, "keep": True, "reason": "oss", "confidence": 0.6}]
+                return AIMessage(content=json.dumps(out))
+
+            return RunnableLambda(oss)
+
+        raise AssertionError(f"unexpected model: {model}")
+
+    monkeypatch.setattr(daily_graph, "_build_llm", fake_build_llm)
+
+    state = {
+        "llm_enabled": True,
+        "llm_config": {
+            "reasoning_model": "deepseek",
+            "vote_enabled": True,
+            "vote_model": "oss",
+            "batch_size": 1,
+        },
+        "routed_papers": [
+            {
+                "arxiv_id": "p1",
+                "title": "T",
+                "abstract": "A",
+                "rule_topic_id": 5,
+                "rule_subtopic": "",
+                "rule_score": 3.0,
+                "rule_ambiguous": True,
+                "rule_candidates": [[5, 3.0], [3, 2.0], [4, 1.0]],
+                "recall_hits": ["agent", "search"],
+            }
+        ],
+    }
+
+    out = daily_graph.llm_adjudicate_and_score_node(state)
+    assert calls["oss"] == 1
+    # DeepSeek called twice because OSS disagreed.
+    assert calls["deepseek"] == 2
+    scored = out["scored_papers"][0]
+    assert scored["paper_id"] == "p1"
+    assert scored["reason"] == "ds2"
+    assert scored["topic_id"] == 4

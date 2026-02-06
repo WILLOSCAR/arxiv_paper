@@ -51,6 +51,10 @@ def _derive_llm_config(cfg: dict) -> dict:
         out["batch_size"] = daily.get("llm_batch_size")
     if daily.get("llm_scope") is not None:
         out["scope"] = daily.get("llm_scope")
+    if daily.get("llm_vote_enabled") is not None:
+        out["vote_enabled"] = daily.get("llm_vote_enabled")
+    if daily.get("llm_vote_model") is not None:
+        out["vote_model"] = daily.get("llm_vote_model")
 
     return out
 

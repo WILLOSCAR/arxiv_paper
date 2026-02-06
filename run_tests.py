@@ -5,7 +5,7 @@ Run all tests for arXiv Paper Bot.
 Usage:
     python run_tests.py              # Run all tests
     python run_tests.py -v           # Verbose output
-    python run_tests.py TestFilter   # Run specific test class
+    # If pytest is installed, this script will run pytest; otherwise it falls back to unittest discovery.
 """
 
 import sys
@@ -20,16 +20,22 @@ def run_tests(verbose=False, pattern="test_*.py"):
         verbose: If True, show verbose output
         pattern: Test file pattern (default: test_*.py)
     """
-    # Discover and run tests
-    loader = unittest.TestLoader()
-    start_dir = "tests"
-    suite = loader.discover(start_dir, pattern=pattern)
+    # Prefer pytest when available (this repo contains pytest-style tests too).
+    try:
+        import pytest  # type: ignore
+    except Exception:
+        pytest = None
 
-    # Run tests
+    if pytest is not None:
+        args = ["tests"]
+        args.append("-vv" if verbose else "-q")
+        return int(pytest.main(args))
+
+    # Fallback: unittest discovery only.
+    loader = unittest.TestLoader()
+    suite = loader.discover("tests", pattern=pattern)
     runner = unittest.TextTestRunner(verbosity=2 if verbose else 1)
     result = runner.run(suite)
-
-    # Return exit code
     return 0 if result.wasSuccessful() else 1
 
 

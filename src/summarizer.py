@@ -199,14 +199,30 @@ FIELD_NAME: content
         return summary
 
 
-# Placeholder for future implementations
 class GLMSummarizer(PaperSummarizer):
     """Summarizer using GLM (Zhipu AI) models."""
 
-    pass
+    def __init__(self, config: SummarizerConfig):
+        super().__init__(config)
 
 
 class GeminiSummarizer(PaperSummarizer):
     """Summarizer using Google Gemini models with search capabilities."""
 
-    pass
+    def __init__(self, config: SummarizerConfig):
+        super().__init__(config)
+
+
+def create_summarizer(config: SummarizerConfig) -> PaperSummarizer:
+    """
+    Factory to create a summarizer instance based on provider.
+
+    The current implementation uses OpenAI-compatible APIs for all providers.
+    Provider-specific subclasses are thin wrappers kept for future extension.
+    """
+    provider = (config.provider or "").strip().lower()
+    if provider == "glm":
+        return GLMSummarizer(config)
+    if provider == "gemini":
+        return GeminiSummarizer(config)
+    return PaperSummarizer(config)

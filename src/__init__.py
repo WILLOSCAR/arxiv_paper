@@ -6,7 +6,7 @@ from .fetcher import ArxivFetcher
 from .filter import PaperFilter, DynamicFilter
 from .models import Paper, FetchConfig, FilterConfig
 from .storage import PaperStorage
-from .summarizer import PaperSummarizer, SummarizerConfig
+from .summarizer import PaperSummarizer, SummarizerConfig, create_summarizer
 from .notifier import NotificationConfig, build_notifier
 from .validators import StageValidator, ValidationResult, validate_pipeline_stage
 from .api_client import APIClient, OpenRouterClient, create_client
@@ -28,6 +28,7 @@ __all__ = [
     "PaperStorage",
     "PaperSummarizer",
     "SummarizerConfig",
+    "create_summarizer",
     "NotificationConfig",
     "build_notifier",
     # Validators

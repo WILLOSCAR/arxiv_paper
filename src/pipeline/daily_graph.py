@@ -205,6 +205,19 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
     if not papers:
         return {"scored_papers": []}
 
+    def _consistent(a: dict, b: dict) -> bool:
+        """Heuristic agreement check between two LLM results."""
+        try:
+            a_tid = int(a.get("topic_id"))
+            b_tid = int(b.get("topic_id"))
+        except Exception:
+            return False
+        if a_tid != b_tid:
+            return False
+        if bool(a.get("keep")) != bool(b.get("keep")):
+            return False
+        return True
+
     def _rule_fallback_for(p: dict, *, reason: str, confidence: float) -> dict:
         """Rule-only fallback decision (keeps secrets out of state/output)."""
         # Rough normalization: rule_score in [0, ~6] -> relevance in [0, 1]
@@ -238,7 +251,7 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
     rubric_text = state.get("rubric_text") or DEFAULT_INTEREST_RUBRIC_TEXT
 
     try:
-        llm = _build_llm(llm_cfg, task="score")
+        llm_primary = _build_llm(llm_cfg, task="score")
     except Exception as exc:
         logger.warning("LLM disabled due to config error: %s", exc)
         # Graceful fallback: proceed with rule-only scoring.
@@ -254,6 +267,20 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
             )
             scored.append(p2)
         return {"llm_enabled": False, "scored_papers": scored}
+
+    vote_enabled = bool(llm_cfg.get("vote_enabled") or llm_cfg.get("vote_model"))
+    vote_model = (llm_cfg.get("vote_model") or "").strip()
+    llm_secondary = None
+    if vote_enabled and vote_model:
+        try:
+            cfg2 = dict(llm_cfg)
+            # For scoring tasks, _build_llm picks `reasoning_model`, so override it.
+            cfg2["reasoning_model"] = vote_model
+            llm_secondary = _build_llm(cfg2, task="score")
+        except Exception as exc:
+            # Secondary model is best-effort; keep going with primary only.
+            logger.warning("LLM vote disabled (secondary model init failed): %s", exc)
+            llm_secondary = None
 
     llm_scope = (llm_cfg.get("scope") or llm_cfg.get("mode") or "all").strip().lower()
     if llm_scope in {"ambiguous", "ambiguous_only", "ambiguous-only"}:
@@ -308,13 +335,32 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
             )
 
         try:
-            msg = (prompt | llm).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
+            msg = (prompt | llm_primary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
             content = _strip_code_fences(getattr(msg, "content", "") or "")
-            parsed = json.loads(content)
-            if not isinstance(parsed, list):
+            parsed_primary = json.loads(content)
+            if not isinstance(parsed_primary, list):
                 raise ValueError("LLM output is not a JSON array")
 
-            for item in parsed:
+            parsed_final = parsed_primary
+            if llm_secondary is not None:
+                try:
+                    msg2 = (prompt | llm_secondary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
+                    content2 = _strip_code_fences(getattr(msg2, "content", "") or "")
+                    parsed_secondary = json.loads(content2)
+                    if not isinstance(parsed_secondary, list):
+                        raise ValueError("Secondary LLM output is not a JSON array")
+                    if parsed_primary and parsed_secondary and not _consistent(parsed_primary[0], parsed_secondary[0]):
+                        # Tie-break: rerun primary once and trust it as the final output.
+                        msg3 = (prompt | llm_primary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
+                        content3 = _strip_code_fences(getattr(msg3, "content", "") or "")
+                        parsed_rerun = json.loads(content3)
+                        if isinstance(parsed_rerun, list) and parsed_rerun:
+                            parsed_final = parsed_rerun
+                except Exception as exc:
+                    # Secondary call is best-effort; keep primary output.
+                    logger.warning("LLM vote skipped for batch (secondary error): %s", exc)
+
+            for item in parsed_final:
                 paper_id = str(item.get("paper_id") or "").strip()
                 if not paper_id:
                     continue

@@ -17,7 +17,7 @@ from src import (
     FilterConfig,
     PaperFilter,
     PaperStorage,
-    PaperSummarizer,
+    create_summarizer,
     SummarizerConfig,
     NotificationConfig,
     build_notifier,
@@ -99,6 +99,16 @@ def main():
     logger.info("=" * 60)
 
     try:
+        # Test mode: reduce workload (no config file changes; only in-memory overrides).
+        if args.test:
+            logger.info("Running in TEST mode (reduced fetch + output size)")
+            if isinstance(config.get("arxiv"), dict):
+                config["arxiv"]["max_results"] = min(int(config["arxiv"].get("max_results", 50)), 10)
+            if isinstance(config.get("filter"), dict):
+                config["filter"]["top_k"] = min(int(config["filter"].get("top_k", 20)), 5)
+            if isinstance(config.get("notification"), dict):
+                config["notification"]["enabled"] = False
+
         # Step 1: Fetch papers from arXiv
         logger.info("\n[1/5] Fetching papers from arXiv...")
 
@@ -162,7 +172,7 @@ def main():
             fields=summarizer_config_dict.get("fields", []),
         )
 
-        summarizer = PaperSummarizer(summarizer_config)
+        summarizer = create_summarizer(summarizer_config)
 
         if summarizer_config.enabled:
             filtered_papers = summarizer.summarize_papers(filtered_papers)

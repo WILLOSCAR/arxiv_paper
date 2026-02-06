@@ -2,6 +2,7 @@
 
 import logging
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import List, Optional, Protocol
 
 from ..models import Paper, FilterConfig
@@ -62,7 +63,7 @@ class Orchestrator:
 
     Selects and executes the appropriate ranking strategy based on configuration:
     - "static": Use PaperFilter (keyword-only matching)
-    - "dynamic": Use DynamicFilter (with preference learning - placeholder)
+    - "dynamic": Use DynamicFilter (feedback-aware preference learning)
     - "agent": Use AgentFilter (LangGraph-enhanced filtering)
     """
 
@@ -145,6 +146,9 @@ class Orchestrator:
         else:
             result = papers
 
+        # Optional vector-based re-ranking (lightweight hashing fallback if deps missing).
+        result = self._maybe_apply_vector_ranking(result, context=context)
+
         # Store explanations if available
         if hasattr(self._strategy, "get_explanations"):
             self._explanations = self._strategy.get_explanations()
@@ -218,3 +222,64 @@ class Orchestrator:
                 logger.warning(f"Failed to load user profile: {e}")
 
         return None
+
+    def _maybe_apply_vector_ranking(self, papers: List[Paper], *, context: dict) -> List[Paper]:
+        vector_cfg = (self.config.personalization_config or {}).get("vector_ranking") or {}
+        if not vector_cfg.get("enabled", False):
+            return papers
+
+        feedback = (context or {}).get("feedback") or {}
+        liked_entries = feedback.get("liked") or []
+        if not liked_entries:
+            return papers
+
+        try:
+            from ..personalization import PersonalizedRanker
+        except Exception:
+            logger.debug("PersonalizedRanker import failed; skipping vector ranking", exc_info=True)
+            return papers
+
+        now = datetime.now(timezone.utc)
+        liked_papers: List[Paper] = []
+        for entry in liked_entries:
+            if not isinstance(entry, dict):
+                continue
+            pid = entry.get("paper_id") or entry.get("arxiv_id") or ""
+            title = entry.get("title") or ""
+            abstract = entry.get("abstract") or ""
+            cats = entry.get("categories") or []
+            if not isinstance(cats, list):
+                cats = []
+            primary = entry.get("primary_category") or (cats[0] if cats else "")
+
+            if not pid or not title:
+                continue
+
+            liked_papers.append(
+                Paper(
+                    arxiv_id=str(pid),
+                    title=str(title),
+                    abstract=str(abstract),
+                    authors=[],
+                    primary_category=str(primary),
+                    categories=[str(c) for c in cats if c],
+                    pdf_url=str(entry.get("pdf_url") or ""),
+                    entry_url=str(entry.get("entry_url") or ""),
+                    published=now,
+                    updated=now,
+                )
+            )
+
+        if not liked_papers:
+            return papers
+
+        ranker = PersonalizedRanker(
+            model_name=str(vector_cfg.get("model") or "allenai/specter"),
+            enabled=True,
+        )
+        weight = float(vector_cfg.get("weight", 0.4))
+        try:
+            return ranker.rank_by_similarity(papers, liked_papers, weight=weight)
+        except Exception:
+            logger.debug("Vector ranking failed; skipping", exc_info=True)
+            return papers

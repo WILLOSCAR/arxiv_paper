@@ -42,7 +42,7 @@ filter:
 
   # Filter mode:
   # - "static": Keyword-based only (default, no LLM needed)
-  # - "dynamic": With preference learning (placeholder)
+  # - "dynamic": With preference learning (uses user feedback to adjust weights)
   # - "agent": LangGraph agent-enhanced filtering (requires OpenAI API)
   mode: static  # Change to "agent" to enable LangGraph pipeline
 
@@ -149,7 +149,7 @@ personalization:
     enabled: false
     model: allenai/specter
     weight: 0.4
-    vector_db: chromadb
+    vector_db: chromadb  # 目前未接入 DB；enabled 时会用本地 embedding 做重排
 
   # LangGraph Agent configuration
   agent:
@@ -279,6 +279,12 @@ daily:
 
   # Batch size for LLM calls
   llm_batch_size: 1
+
+  # LLM voting / consistency check:
+  # - Run a second model (vote_model) to sanity-check against DeepSeek.
+  # - If they disagree, re-run DeepSeek once and trust it as the final output.
+  llm_vote_enabled: true
+  llm_vote_model: openai/gpt-oss-120b:free
 
   # Also write raw/enriched/routed/scored JSONL files under data/index/<day>/
   save_intermediates: true
