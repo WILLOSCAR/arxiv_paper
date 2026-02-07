@@ -1,0 +1,581 @@
+{
+  "day": "2026-02-06",
+  "timezone": "Asia/Shanghai",
+  "rubric": "My research interests span multiple directions, with a core focus on LLM and MLLM systems. Within that scope, I especially care about agents and reinforcement learning (RL), memory mechanisms, reasoning, technical reports/systematic method synthesis, and unified multimodal understanding/generation models. I also maintain strong interest in agentic search, deep research, and AI search workflows, as well as work on human-model collaboration in HCI + LLM settings.",
+  "threshold": 0.55,
+  "llm_enabled": false,
+  "topics": [
+    {
+      "topic_id": 1,
+      "topic": "LLM/MLLM Foundations & Unified Modeling",
+      "limit": 10,
+      "count": 3,
+      "papers": [
+        {
+          "paper_id": "2602.06022v1",
+          "title": "Correctness-Optimized Residual Activation Lens (CORAL): Transferrable and Calibration-Aware Inference-Time Steering",
+          "abstract": "Large language models (LLMs) exhibit persistent miscalibration, especially after instruction tuning and preference alignment. Modified training objectives can improve calibration, but retraining is expensive. Inference-time steering offers a lightweight alternative, yet most existing methods optimize proxies for correctness rather than correctness itself. We introduce CORAL (Correctness-Optimized Residual Activation Lens), a regularized inference-time steering method that captures distributed correctness signals from model internal activations using weight-decay MLP probes. We evaluate CORAL across three 7B-parameter models and find that it consistently improves accuracy by 10\\% and expected calibration error (ECE) by 50\\% on average. We additionally demonstrate that these gains transfer without retraining to the complete published test sets of four held-out benchmarks (ARC-Challenge, HellaSwag, Math-MC, OpenBookQA), averaging 14\\% accuracy improvements and 49\\% ECE improvements. Our results support the hypothesis that distributed information in model internals can be extracted using regularized probes when individual neurons are insufficient. CORAL thus provides a compute-efficient, transferable, and calibration-aware approach to improve MCQA performance during inference.",
+          "authors": [
+            "Miranda Muqing Miao",
+            "Young-Min Cho",
+            "Lyle Ungar"
+          ],
+          "primary_category": "cs.LG",
+          "categories": [
+            "cs.LG",
+            "cs.AI"
+          ],
+          "published": "2026-02-05T18:55:56+00:00",
+          "updated": "2026-02-05T18:55:56+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.06022v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.06022v1",
+          "topic_id": 1,
+          "topic": "LLM/MLLM Foundations & Unified Modeling",
+          "subtopic": "LLM Fundamentals & Alignment",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "CORAL introduces a regularized inference-time steering method that extracts distributed correctness signals from model activations to improve LLM accuracy and calibration without retraining.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "instruction tuning",
+            "alignment",
+            "benchmark"
+          ],
+          "recall_hit_count": 9
+        },
+        {
+          "paper_id": "2602.05827v1",
+          "title": "Sparse Video Generation Propels Real-World Beyond-the-View Vision-Language Navigation",
+          "abstract": "Why must vision-language navigation be bound to detailed and verbose language instructions? While such details ease decision-making, they fundamentally contradict the goal for navigation in the real-world. Ideally, agents should possess the autonomy to navigate in unknown environments guided solely by simple and high-level intents. Realizing this ambition introduces a formidable challenge: Beyond-the-View Navigation (BVN), where agents must locate distant, unseen targets without dense and step-by-step guidance. Existing large language model (LLM)-based methods, though adept at following dense instructions, often suffer from short-sighted behaviors due to their reliance on short-horimzon supervision. Simply extending the supervision horizon, however, destabilizes LLM training. In this work, we identify that video generation models inherently benefit from long-horizon supervision to align with language instructions, rendering them uniquely suitable for BVN tasks. Capitalizing on this insight, we propose introducing the video generation model into this field for the first time. Yet, the prohibitive latency for generating videos spanning tens of seconds makes real-world deployment impractical. To bridge this gap, we propose SparseVideoNav, achieving sub-second trajectory inference guided by a generated sparse future spanning a 20-second horizon. This yields a remarkable 27x speed-up compared to the unoptimized counterpart. Extensive real-world zero-shot experiments demonstrate that SparseVideoNav achieves 2.5x the success rate of state-of-the-art LLM baselines on BVN tasks and marks the first realization of such capability in challenging night scenes.",
+          "authors": [
+            "Hai Zhang",
+            "Siqi Liang",
+            "Li Chen",
+            "Yuxian Li",
+            "Yukuan Xu",
+            "Yichao Zhong",
+            "Fu Zhang",
+            "Hongyang Li"
+          ],
+          "primary_category": "cs.CV",
+          "categories": [
+            "cs.CV",
+            "cs.RO"
+          ],
+          "published": "2026-02-05T16:16:13+00:00",
+          "updated": "2026-02-05T16:16:13+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05827v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05827v1",
+          "topic_id": 1,
+          "topic": "LLM/MLLM Foundations & Unified Modeling",
+          "subtopic": "LLM Fundamentals & Alignment",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "This paper proposes using sparse video generation models to enable vision-language navigation agents to locate distant, unseen targets guided only by high-level intents rather than detailed step-by-step instructions.",
+          "recall_hits": [
+            "llm",
+            "large language model",
+            "language model",
+            "vision-language",
+            "agent",
+            "agents"
+          ],
+          "recall_hit_count": 6
+        },
+        {
+          "paper_id": "2602.05932v1",
+          "title": "Polyglots or Multitudes? Multilingual LLM Answers to Value-laden Multiple-Choice Questions",
+          "abstract": "Multiple-Choice Questions (MCQs) are often used to assess knowledge, reasoning abilities, and even values encoded in large language models (LLMs). While the effect of multilingualism has been studied on LLM factual recall, this paper seeks to investigate the less explored question of language-induced variation in value-laden MCQ responses. Are multilingual LLMs consistent in their responses across languages, i.e. behave like theoretical polyglots, or do they answer value-laden MCQs depending on the language of the question, like a multitude of monolingual models expressing different values through a single model? We release a new corpus, the Multilingual European Value Survey (MEVS), which, unlike prior work relying on machine translation or ad hoc prompts, solely comprises human-translated survey questions aligned in 8 European languages. We administer a subset of those questions to over thirty multilingual LLMs of various sizes, manufacturers and alignment-fine-tuning status under comprehensive, controlled prompt variations including answer order, symbol type, and tail character. Our results show that while larger, instruction-tuned models display higher overall consistency, the robustness of their responses varies greatly across questions, with certain MCQs eliciting total agreement within and across models while others leave LLM answers split. Language-specific behavior seems to arise in all consistent, instruction-fine-tuned models, but only on certain questions, warranting a further study of the selective effect of preference fine-tuning.",
+          "authors": [
+            "Léo Labat",
+            "Etienne Ollion",
+            "François Yvon"
+          ],
+          "primary_category": "cs.CL",
+          "categories": [
+            "cs.CL"
+          ],
+          "published": "2026-02-05T17:44:06+00:00",
+          "updated": "2026-02-05T17:44:06+00:00",
+          "comment": "17 pages, 5 figures (8 pages of references and appendices)",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05932v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05932v1",
+          "topic_id": 1,
+          "topic": "LLM/MLLM Foundations & Unified Modeling",
+          "subtopic": "LLM Fundamentals & Alignment",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "Using the new Multilingual European Value Survey corpus, this study investigates whether multilingual LLMs respond consistently to value-laden questions across different languages or exhibit language-dependent value variations.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "alignment",
+            "reasoning",
+            "survey"
+          ],
+          "recall_hit_count": 9
+        }
+      ]
+    },
+    {
+      "topic_id": 2,
+      "topic": "Reasoning & Planning",
+      "limit": 10,
+      "count": 2,
+      "papers": [
+        {
+          "paper_id": "2602.05897v1",
+          "title": "Stop Rewarding Hallucinated Steps: Faithfulness-Aware Step-Level Reinforcement Learning for Small Reasoning Models",
+          "abstract": "As large language models become smaller and more efficient, small reasoning models (SRMs) are crucial for enabling chain-of-thought (CoT) reasoning in resource-constrained settings. However, they are prone to faithfulness hallucinations, especially in intermediate reasoning steps. Existing mitigation methods based on online reinforcement learning rely on outcome-based rewards or coarse-grained CoT evaluation, which can inadvertently reinforce unfaithful reasoning when the final answer is correct. To address these limitations, we propose Faithfulness-Aware Step-Level Reinforcement Learning (FaithRL), introducing step-level supervision via explicit faithfulness rewards from a process reward model, together with an implicit truncated resampling strategy that generates contrastive signals from faithful prefixes. Experiments across multiple SRMs and Open-Book QA benchmarks demonstrate that FaithRL consistently reduces hallucinations in both the CoT and final answers, leading to more faithful and reliable reasoning. Code is available at https://github.com/Easy195/FaithRL.",
+          "authors": [
+            "Shuo Nie",
+            "Hexuan Deng",
+            "Chao Wang",
+            "Ruiyu Fang",
+            "Xuebo Liu",
+            "Shuangyong Song",
+            "Yu Li",
+            "Min Zhang",
+            "Xuelong Li"
+          ],
+          "primary_category": "cs.CL",
+          "categories": [
+            "cs.CL"
+          ],
+          "published": "2026-02-05T17:15:12+00:00",
+          "updated": "2026-02-05T17:15:12+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05897v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05897v1",
+          "topic_id": 2,
+          "topic": "Reasoning & Planning",
+          "subtopic": "Reasoning (Math/Logic/Code)",
+          "relevance": 0.7916666666666666,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "FaithRL reduces hallucinations in small reasoning models by introducing step-level supervision through explicit faithfulness rewards and a truncated resampling strategy that generates contrastive signals from faithful prefixes.",
+          "recall_hits": [
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "reinforcement learning",
+            "reasoning",
+            "chain-of-thought",
+            "cot",
+            "benchmark"
+          ],
+          "recall_hit_count": 9
+        },
+        {
+          "paper_id": "2602.05879v1",
+          "title": "EuroLLM-22B: Technical Report",
+          "abstract": "This report presents EuroLLM-22B, a large language model trained from scratch to support the needs of European citizens by covering all 24 official European Union languages and 11 additional languages. EuroLLM addresses the issue of European languages being underrepresented and underserved in existing open large language models. We provide a comprehensive overview of EuroLLM-22B's development, including tokenizer design, architectural specifications, data filtering, and training procedures. Across a broad set of multilingual benchmarks, EuroLLM-22B demonstrates strong performance in reasoning, instruction following, and translation, achieving results competitive with models of comparable size. To support future research, we release our base and instruction-tuned models, our multilingual web pretraining data and updated EuroBlocks instruction datasets, as well as our pre-training and evaluation codebases.",
+          "authors": [
+            "Miguel Moura Ramos",
+            "Duarte M. Alves",
+            "Hippolyte Gisserot-Boukhlef",
+            "João Alves",
+            "Pedro Henrique Martins",
+            "Patrick Fernandes",
+            "José Pombal",
+            "Nuno M. Guerreiro",
+            "Ricardo Rei",
+            "Nicolas Boizard",
+            "Amin Farajian",
+            "Mateusz Klimaszewski",
+            "José G. C. de Souza",
+            "Barry Haddow",
+            "François Yvon",
+            "Pierre Colombo",
+            "Alexandra Birch",
+            "André F. T. Martins"
+          ],
+          "primary_category": "cs.CL",
+          "categories": [
+            "cs.CL",
+            "cs.AI",
+            "cs.LG"
+          ],
+          "published": "2026-02-05T16:53:47+00:00",
+          "updated": "2026-02-05T16:53:47+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05879v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05879v1",
+          "topic_id": 2,
+          "topic": "Reasoning & Planning",
+          "subtopic": "Reasoning (Math/Logic/Code)",
+          "relevance": 0.5833333333333334,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "EuroLLM-22B is a large language model trained from scratch that supports European citizens by covering 35 languages and demonstrating strong performance in reasoning, instruction following, and translation.",
+          "recall_hits": [
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "reasoning",
+            "technical report",
+            "benchmark"
+          ],
+          "recall_hit_count": 7
+        }
+      ]
+    },
+    {
+      "topic_id": 3,
+      "topic": "Agents & RL",
+      "limit": 10,
+      "count": 3,
+      "papers": [
+        {
+          "paper_id": "2602.06008v1",
+          "title": "AgenticPay: A Multi-Agent LLM Negotiation System for Buyer-Seller Transactions",
+          "abstract": "Large language model (LLM)-based agents are increasingly expected to negotiate, coordinate, and transact autonomously, yet existing benchmarks lack principled settings for evaluating language-mediated economic interaction among multiple agents. We introduce AgenticPay, a benchmark and simulation framework for multi-agent buyer-seller negotiation driven by natural language. AgenticPay models markets in which buyers and sellers possess private constraints and product-dependent valuations, and must reach agreements through multi-round linguistic negotiation rather than numeric bidding alone. The framework supports a diverse suite of over 110 tasks ranging from bilateral bargaining to many-to-many markets, with structured action extraction and metrics for feasibility, efficiency, and welfare. Benchmarking state-of-the-art proprietary and open-weight LLMs reveals substantial gaps in negotiation performance and highlights challenges in long-horizon strategic reasoning, establishing AgenticPay as a foundation for studying agentic commerce and language-based market interaction. Code and dataset are available at the link: https://github.com/SafeRL-Lab/AgenticPay.",
+          "authors": [
+            "Xianyang Liu",
+            "Shangding Gu",
+            "Dawn Song"
+          ],
+          "primary_category": "cs.AI",
+          "categories": [
+            "cs.AI",
+            "cs.LG"
+          ],
+          "published": "2026-02-05T18:50:36+00:00",
+          "updated": "2026-02-05T18:50:36+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.06008v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.06008v1",
+          "topic_id": 3,
+          "topic": "Agents & RL",
+          "subtopic": "Agent Architectures (single/multi-agent, collaboration)",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "AgenticPay is a benchmark and simulation framework for multi-agent buyer-seller negotiation driven by natural language that models markets with private constraints and product-dependent valuations.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "large language model",
+            "language model",
+            "agent",
+            "agents",
+            "agentic",
+            "multi-agent",
+            "reasoning",
+            "benchmark"
+          ],
+          "recall_hit_count": 11
+        },
+        {
+          "paper_id": "2602.05818v1",
+          "title": "TKG-Thinker: Towards Dynamic Reasoning over Temporal Knowledge Graphs via Agentic Reinforcement Learning",
+          "abstract": "Temporal knowledge graph question answering (TKGQA) aims to answer time-sensitive questions by leveraging temporal knowledge bases. While Large Language Models (LLMs) demonstrate significant potential in TKGQA, current prompting strategies constrain their efficacy in two primary ways. First, they are prone to reasoning hallucinations under complex temporal constraints. Second, static prompting limits model autonomy and generalization, as it lack optimization through dynamic interaction with temporal knowledge graphs (TKGs) environments. To address these limitations, we propose \\textbf{TKG-Thinker}, a novel agent equipped with autonomous planning and adaptive retrieval capabilities for reasoning over TKGs. Specifically, TKG-Thinker performs in-depth temporal reasoning through dynamic multi-turn interactions with TKGs via a dual-training strategy. We first apply Supervised Fine-Tuning (SFT) with chain-of thought data to instill core planning capabilities, followed by a Reinforcement Learning (RL) stage that leverages multi-dimensional rewards to refine reasoning policies under intricate temporal constraints. Experimental results on benchmark datasets with three open-source LLMs show that TKG-Thinker achieves state-of-the-art performance and exhibits strong generalization across complex TKGQA settings.",
+          "authors": [
+            "Zihao Jiang",
+            "Miao Peng",
+            "Zhenyan Shan",
+            "Wenjie Xu",
+            "Ben Liu",
+            "Gong Chen",
+            "Ziqi Gao",
+            "Min Peng"
+          ],
+          "primary_category": "cs.AI",
+          "categories": [
+            "cs.AI",
+            "cs.DB"
+          ],
+          "published": "2026-02-05T16:08:36+00:00",
+          "updated": "2026-02-05T16:08:36+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05818v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05818v1",
+          "topic_id": 3,
+          "topic": "Agents & RL",
+          "subtopic": "Agent Architectures (single/multi-agent, collaboration)",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "TKG-Thinker is a novel agent with autonomous planning and adaptive retrieval capabilities that performs dynamic multi-turn interactions with temporal knowledge graphs to answer time-sensitive questions.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "prompting",
+            "agent",
+            "agentic",
+            "planning"
+          ],
+          "recall_hit_count": 16
+        },
+        {
+          "paper_id": "2602.05965v1",
+          "title": "Learning to Share: Selective Memory for Efficient Parallel Agentic Systems",
+          "abstract": "Agentic systems solve complex tasks by coordinating multiple agents that iteratively reason, invoke tools, and exchange intermediate results. To improve robustness and solution quality, recent approaches deploy multiple agent teams running in parallel to explore diverse reasoning trajectories. However, parallel execution comes at a significant computational cost: when different teams independently reason about similar sub-problems or execute analogous steps, they repeatedly perform substantial overlapping computation. To address these limitations, in this paper, we propose Learning to Share (LTS), a learned shared-memory mechanism for parallel agentic frameworks that enables selective cross-team information reuse while controlling context growth. LTS introduces a global memory bank accessible to all teams and a lightweight controller that decides whether intermediate agent steps should be added to memory or not. The controller is trained using stepwise reinforcement learning with usage-aware credit assignment, allowing it to identify information that is globally useful across parallel executions. Experiments on the AssistantBench and GAIA benchmarks show that LTS significantly reduces overall runtime while matching or improving task performance compared to memory-free parallel baselines, demonstrating that learned memory admission is an effective strategy for improving the efficiency of parallel agentic systems. Project page: https://joefioresi718.github.io/LTS_webpage/",
+          "authors": [
+            "Joseph Fioresi",
+            "Parth Parag Kulkarni",
+            "Ashmal Vayani",
+            "Song Wang",
+            "Mubarak Shah"
+          ],
+          "primary_category": "cs.MA",
+          "categories": [
+            "cs.MA",
+            "cs.AI"
+          ],
+          "published": "2026-02-05T18:20:21+00:00",
+          "updated": "2026-02-05T18:20:21+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05965v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05965v1",
+          "topic_id": 3,
+          "topic": "Agents & RL",
+          "subtopic": "Agent Architectures (single/multi-agent, collaboration)",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "LTS is a learned shared-memory mechanism for parallel agentic frameworks that enables selective cross-team information reuse while controlling context growth to reduce computational costs.",
+          "recall_hits": [
+            "agent",
+            "agents",
+            "agentic",
+            "reinforcement learning",
+            "memory",
+            "memory bank",
+            "reasoning",
+            "benchmark"
+          ],
+          "recall_hit_count": 8
+        }
+      ]
+    },
+    {
+      "topic_id": 4,
+      "topic": "Memory & Personalization",
+      "limit": 10,
+      "count": 0,
+      "papers": []
+    },
+    {
+      "topic_id": 5,
+      "topic": "Agentic Search / Deep Research / AI Search",
+      "limit": 10,
+      "count": 1,
+      "papers": [
+        {
+          "paper_id": "2602.05975v1",
+          "title": "SAGE: Benchmarking and Improving Retrieval for Deep Research Agents",
+          "abstract": "Deep research agents have emerged as powerful systems for addressing complex queries. Meanwhile, LLM-based retrievers have demonstrated strong capability in following instructions or reasoning. This raises a critical question: can LLM-based retrievers effectively contribute to deep research agent workflows? To investigate this, we introduce SAGE, a benchmark for scientific literature retrieval comprising 1,200 queries across four scientific domains, with a 200,000 paper retrieval corpus.We evaluate six deep research agents and find that all systems struggle with reasoning-intensive retrieval. Using DR Tulu as backbone, we further compare BM25 and LLM-based retrievers (i.e., ReasonIR and gte-Qwen2-7B-instruct) as alternative search tools. Surprisingly, BM25 significantly outperforms LLM-based retrievers by approximately 30%, as existing agents generate keyword-oriented sub-queries. To improve performance, we propose a corpus-level test-time scaling framework that uses LLMs to augment documents with metadata and keywords, making retrieval easier for off-the-shelf retrievers. This yields 8% and 2% gains on short-form and open-ended questions, respectively.",
+          "authors": [
+            "Tiansheng Hu",
+            "Yilun Zhao",
+            "Canyu Zhang",
+            "Arman Cohan",
+            "Chen Zhao"
+          ],
+          "primary_category": "cs.IR",
+          "categories": [
+            "cs.IR",
+            "cs.CL"
+          ],
+          "published": "2026-02-05T18:25:24+00:00",
+          "updated": "2026-02-05T18:25:24+00:00",
+          "comment": "Submission to ACL ARR 2026 January",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05975v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05975v1",
+          "topic_id": 5,
+          "topic": "Agentic Search / Deep Research / AI Search",
+          "subtopic": "Deep Research Workflow (research agent/report)",
+          "relevance": 1.0,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "SAGE is a benchmark for scientific literature retrieval that reveals current deep research agents struggle with reasoning-intensive retrieval, and proposes a corpus-level test-time scaling framework that improves performance by augmenting documents with metadata and keywords.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "agent",
+            "agents",
+            "reasoning",
+            "search",
+            "retrieval",
+            "deep research",
+            "research agent",
+            "benchmark"
+          ],
+          "recall_hit_count": 10
+        }
+      ]
+    },
+    {
+      "topic_id": 6,
+      "topic": "Technical Reports / Surveys / Systematic Synthesis",
+      "limit": 10,
+      "count": 0,
+      "papers": []
+    },
+    {
+      "topic_id": 7,
+      "topic": "HCI + LLM (Human-AI Collaboration)",
+      "limit": 5,
+      "count": 3,
+      "papers": [
+        {
+          "paper_id": "2602.05987v1",
+          "title": "From Human-Human Collaboration to Human-Agent Collaboration: A Vision, Design Philosophy, and an Empirical Framework for Achieving Successful Partnerships Between Humans and LLM Agents",
+          "abstract": "The emergence of Large Language Model (LLM) agents enables us to build agent-based intelligent systems that move beyond the role of a \"tool\" to become genuine collaborators with humans, thereby realizing a novel human-agent collaboration paradigm. Our vision is that LLM agents should resemble remote human collaborators, which allows HCI researchers to ground the future exploration in decades of research on trust, awareness, and common ground in remote human collaboration, while also revealing the unique opportunities and challenges that emerge when one or more partners are AI agents. This workshop establishes a foundational research agenda for the new era by posing the question: How can the rich understanding of remote human collaboration inspire and inform the design and study of human-agent collaboration? We will bring together an interdisciplinary group from HCI, CSCW, and AI to explore this critical transition. The 180-minute workshop will be highly interactive, featuring a keynote speaker, a series of invited lightning talks, and an exploratory group design session where participants will storyboard novel paradigms of human-agent partnership. Our goal is to enlighten the research community by cultivating a shared vocabulary and producing a research agenda that charts the future of collaborative agents.",
+          "authors": [
+            "Bingsheng Yao",
+            "Chaoran Chen",
+            "April Yi Wang",
+            "Sherry Tongshuang Wu",
+            "Toby Jia-jun Li",
+            "Dakuo Wang"
+          ],
+          "primary_category": "cs.HC",
+          "categories": [
+            "cs.HC"
+          ],
+          "published": "2026-02-05T18:36:15+00:00",
+          "updated": "2026-02-05T18:36:15+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05987v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05987v1",
+          "topic_id": 7,
+          "topic": "HCI + LLM (Human-AI Collaboration)",
+          "subtopic": "Interaction & Controllability (UI/feedback)",
+          "relevance": 0.8333333333333334,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "This workshop establishes a foundational research agenda for human-agent collaboration by exploring how the understanding of remote human collaboration can inform the design and study of partnerships between humans and LLM agents.",
+          "recall_hits": [
+            "llm",
+            "large language model",
+            "language model",
+            "agent",
+            "agents",
+            "hci",
+            "collaboration"
+          ],
+          "recall_hit_count": 7
+        },
+        {
+          "paper_id": "2602.05819v1",
+          "title": "Authorship Drift: How Self-Efficacy and Trust Evolve During LLM-Assisted Writing",
+          "abstract": "Large language models (LLMs) are increasingly used as collaborative partners in writing. However, this raises a critical challenge of authorship, as users and models jointly shape text across interaction turns. Understanding authorship in this context requires examining users' evolving internal states during collaboration, particularly self-efficacy and trust. Yet, the dynamics of these states and their associations with users' prompting strategies and authorship outcomes remain underexplored. We examined these dynamics through a study of 302 participants in LLM-assisted writing, capturing interaction logs and turn-by-turn self-efficacy and trust ratings. Our analysis showed that collaboration generally decreased users' self-efficacy while increasing trust. Participants who lost self-efficacy were more likely to ask the LLM to edit their work directly, whereas those who recovered self-efficacy requested more review and feedback. Furthermore, participants with stable self-efficacy showed higher actual and perceived authorship of the final text. Based on these findings, we propose design implications for understanding and supporting authorship in human-LLM collaboration.",
+          "authors": [
+            "Yeon Su Park",
+            "Nadia Azzahra Putri Arvi",
+            "Seoyoung Kim",
+            "Juho Kim"
+          ],
+          "primary_category": "cs.HC",
+          "categories": [
+            "cs.HC"
+          ],
+          "published": "2026-02-05T16:10:04+00:00",
+          "updated": "2026-02-05T16:10:04+00:00",
+          "comment": "Conditionally accepted to CHI 2026",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05819v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05819v1",
+          "topic_id": 7,
+          "topic": "HCI + LLM (Human-AI Collaboration)",
+          "subtopic": "Interaction & Controllability (UI/feedback)",
+          "relevance": 0.75,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "This study reveals that LLM-assisted writing generally decreases users' self-efficacy while increasing their trust, with participants experiencing stable self-efficacy demonstrating higher authorship of the final text.",
+          "recall_hits": [
+            "llm",
+            "llms",
+            "large language model",
+            "large language models",
+            "language model",
+            "language models",
+            "prompting",
+            "review",
+            "interaction",
+            "collaboration"
+          ],
+          "recall_hit_count": 10
+        },
+        {
+          "paper_id": "2602.05864v1",
+          "title": "Prompting Destiny: Negotiating Socialization and Growth in an LLM-Mediated Speculative Gameworld",
+          "abstract": "We present an LLM-mediated role-playing game that supports reflection on socialization, moral responsibility, and educational role positioning. Grounded in socialization theory, the game follows a four-season structure in which players guide a child prince through morally charged situations and compare the LLM-mediated NPC's differentiated responses across stages, helping them reason about how educational guidance shifts with socialization. To approximate real educational contexts and reduce score-chasing, the system hides real-time evaluative scores and provides delayed, end-of-stage growth feedback as reflective prompts. We conducted a user study (N=12) with gameplay logs and post-game interviews, analyzed via reflexive thematic analysis. Findings show how players negotiated responsibility and role positioning, and reveal an entry-load tension between open-ended expression and sustained engagement. We contribute design knowledge on translating sociological models of socialization into reflective AI-mediated game systems.",
+          "authors": [
+            "Mandi Yang",
+            "Zhiqi Gao",
+            "Yibo Meng",
+            "Dongyijie Primo Pan"
+          ],
+          "primary_category": "cs.HC",
+          "categories": [
+            "cs.HC"
+          ],
+          "published": "2026-02-05T16:44:44+00:00",
+          "updated": "2026-02-05T16:44:44+00:00",
+          "comment": "",
+          "journal_ref": "",
+          "doi": "",
+          "entry_url": "http://arxiv.org/abs/2602.05864v1",
+          "pdf_url": "https://arxiv.org/pdf/2602.05864v1",
+          "topic_id": 7,
+          "topic": "HCI + LLM (Human-AI Collaboration)",
+          "subtopic": "Human-in-the-loop Evaluation (efficiency/trust)",
+          "relevance": 0.5833333333333334,
+          "confidence": 0.2,
+          "reason": "Fallback (LLM config error): matched keywords + category priors.",
+          "one_sentence_summary": "This research presents an LLM-mediated role-playing game that supports reflection on socialization and moral responsibility, revealing how players negotiate responsibility and role positioning while experiencing tension between open-ended expression and sustained engagement.",
+          "recall_hits": [
+            "llm",
+            "prompting",
+            "user study"
+          ],
+          "recall_hit_count": 3
+        }
+      ]
+    }
+  ]
+}

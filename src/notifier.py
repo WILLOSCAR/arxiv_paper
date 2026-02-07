@@ -1,4 +1,4 @@
-"""Notification helpers for pushing 论文摘要到外部渠道."""
+"""Notification helpers for pushing paper digests to external channels."""
 
 from __future__ import annotations
 
@@ -7,9 +7,8 @@ import hashlib
 import hmac
 import json
 import logging
-import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Iterable, List, Optional
 
@@ -21,13 +20,16 @@ from .secrets import resolve_secret
 logger = logging.getLogger(__name__)
 
 
+FEISHU_CARD_SAFE_BYTES = 25_000
+
+
 class NotificationError(RuntimeError):
-    """Raised when通知发送失败."""
+    """Raised when notification delivery fails."""
 
 
 @dataclass
 class NotificationConfig:
-    """High-level notification配置."""
+    """High-level notification configuration."""
 
     enabled: bool = False
     provider: str = ""
@@ -40,18 +42,24 @@ class NotificationConfig:
     wechat_app_id: Optional[str] = None
     wechat_app_secret: Optional[str] = None
     wechat_open_id: Optional[str] = None
-    # 增强选项
-    include_abstract: bool = False  # 是否包含摘要
-    use_rich_format: bool = True    # 是否使用富文本/卡片格式
+    # Enhanced options
+    include_abstract: bool = False  # Include abstract text
+    use_rich_format: bool = True  # Use rich format (card/markdown)
+    card_style: str = "magazine"
+    abstract_preview_chars: int = 220
+    show_authors: bool = True
+    show_keywords: bool = True
+    show_reason: bool = True
+    show_score_badge: bool = True
 
 
 def build_notifier(config: NotificationConfig):
-    """Create notifier instance based on provider配置."""
+    """Create notifier instance based on provider config."""
 
     provider = (config.provider or "").lower()
 
     if not config.enabled or not provider:
-        logger.info("Notification disabled or provider missing,跳过推送")
+        logger.info("Notification disabled or provider missing, skipping push")
         return None
 
     if provider == "feishu":
@@ -63,18 +71,24 @@ def build_notifier(config: NotificationConfig):
                 name="Feishu webhook_url",
             )
         except Exception as exc:
-            raise NotificationError("Feishu 推送需要配置 webhook_url 或 webhook_file") from exc
+            raise NotificationError("Feishu requires webhook_url or webhook_file") from exc
         return FeishuNotifier(
             webhook,
             config.feishu_secret,
             config.top_k,
             use_card=config.use_rich_format,
             include_abstract=config.include_abstract,
+            card_style=config.card_style,
+            abstract_preview_chars=config.abstract_preview_chars,
+            show_authors=config.show_authors,
+            show_keywords=config.show_keywords,
+            show_reason=config.show_reason,
+            show_score_badge=config.show_score_badge,
         )
 
     if provider == "telegram":
         if not config.telegram_bot_token or not config.telegram_chat_id:
-            raise NotificationError("Telegram 推送需要配置 bot_token 和 chat_id")
+            raise NotificationError("Telegram requires bot_token and chat_id")
         return TelegramNotifier(
             bot_token=config.telegram_bot_token,
             chat_id=config.telegram_chat_id,
@@ -94,9 +108,7 @@ def build_notifier(config: NotificationConfig):
             if not value
         ]
         if missing:
-            raise NotificationError(
-                f"WeChat 推送缺少配置: {', '.join(missing)}"
-            )
+            raise NotificationError(f"WeChat missing required settings: {', '.join(missing)}")
         return WeChatNotifier(
             app_id=config.wechat_app_id,
             app_secret=config.wechat_app_secret,
@@ -106,45 +118,76 @@ def build_notifier(config: NotificationConfig):
             include_abstract=config.include_abstract,
         )
 
-    raise NotificationError(f"未知通知渠道: {config.provider}")
+    raise NotificationError(f"Unknown notification provider: {config.provider}")
 
 
 def _format_paper_digest(papers: Iterable[Paper], limit: int) -> str:
-    """将论文列表压缩为多行文本."""
+    """Format paper list into a multiline plain-text digest."""
 
     lines = []
     for idx, paper in enumerate(papers, start=1):
         if idx > limit:
             break
-        keywords = ", ".join(paper.matched_keywords) or "无关键词"
+        keywords = ", ".join(paper.matched_keywords) or "none"
         line = (
             f"{idx}. {paper.title}\n"
-            f"分数: {paper.score:.1f} 关键词: {keywords}\n"
-            f"链接: {paper.entry_url}"
+            f"Score: {paper.score:.1f} | Keywords: {keywords}\n"
+            f"Link: {paper.entry_url}"
         )
         lines.append(line)
 
-    return "\n\n".join(lines) if lines else "今日暂无符合条件的论文。"
+    return "\n\n".join(lines) if lines else "No papers matched today."
+
+
+def _format_daily_topics_digest(grouped_output: dict, per_topic: int = 3) -> str:
+    """Fallback plain-text summary for daily topic output."""
+
+    day = grouped_output.get("day") or datetime.now().strftime("%Y-%m-%d")
+    timezone_name = grouped_output.get("timezone") or "Asia/Shanghai"
+    threshold = grouped_output.get("threshold")
+    topics = grouped_output.get("topics") or []
+
+    lines = [f"📚 arXiv Topic Daily ({day}, {timezone_name})"]
+    if threshold is not None:
+        lines.append(f"Threshold: {float(threshold):.2f}")
+
+    for topic in topics:
+        topic_name = str(topic.get("topic") or "Unknown Topic")
+        lines.append(f"\n【{topic_name}】")
+        papers = topic.get("papers") or []
+        if not papers:
+            lines.append("- No selected papers today")
+            continue
+
+        for idx, paper in enumerate(papers[:per_topic], start=1):
+            title = str(paper.get("title") or "Untitled")
+            rel = float(paper.get("relevance") or 0.0)
+            lines.append(f"- {idx}. {title} (rel={rel:.2f})")
+            entry = str(paper.get("entry_url") or "")
+            if entry:
+                lines.append(f"  {entry}")
+
+    return "\n".join(lines)
 
 
 def _truncate_text(text: str, max_length: int = 200) -> str:
-    """截断文本到指定长度."""
+    """Truncate text to max length."""
     if len(text) <= max_length:
         return text
-    return text[:max_length - 3] + "..."
+    return text[: max_length - 3] + "..."
 
 
 def _escape_telegram_markdown(text: str) -> str:
-    """转义 Telegram MarkdownV2 特殊字符."""
-    # MarkdownV2 需要转义的字符: _ * [ ] ( ) ~ ` > # + - = | { } . !
-    special_chars = r'_*[]()~`>#+-=|{}.!'
+    """Escape Telegram MarkdownV2 special characters."""
+    # MarkdownV2 characters that require escaping.
+    special_chars = r"_*[]()~`>#+-=|{}.!"
     for char in special_chars:
-        text = text.replace(char, f'\\{char}')
+        text = text.replace(char, f"\\{char}")
     return text
 
 
 def _get_papers_stats(papers: List[Paper]) -> dict:
-    """获取论文统计信息."""
+    """Compute digest statistics for a paper list."""
     if not papers:
         return {"count": 0, "avg_score": 0, "min_score": 0, "max_score": 0}
 
@@ -158,7 +201,7 @@ def _get_papers_stats(papers: List[Paper]) -> dict:
 
 
 class BaseNotifier:
-    """统一的通知基类,负责生成正文."""
+    """Shared notifier base class."""
 
     provider_name: str = "base"
 
@@ -167,17 +210,17 @@ class BaseNotifier:
         self.include_abstract = include_abstract
 
     def send(self, papers: Iterable[Paper]) -> None:
-        papers_list = list(papers)[:self.top_k]
+        papers_list = list(papers)[: self.top_k]
         message = _format_paper_digest(papers_list, self.top_k)
         self._send_message(message, papers_list)
-        logger.info("%s 推送完成", self.provider_name)
+        logger.info("%s push completed", self.provider_name)
 
     def _send_message(self, message: str, papers: List[Paper] = None) -> None:  # pragma: no cover - interface
         raise NotImplementedError
 
 
 class FeishuNotifier(BaseNotifier):
-    """飞书群机器人推送 - 支持消息卡片."""
+    """Feishu group bot notifier with card support."""
 
     provider_name = "Feishu"
 
@@ -188,11 +231,23 @@ class FeishuNotifier(BaseNotifier):
         top_k: int = 5,
         use_card: bool = True,
         include_abstract: bool = False,
+        card_style: str = "magazine",
+        abstract_preview_chars: int = 180,
+        show_authors: bool = True,
+        show_keywords: bool = True,
+        show_reason: bool = True,
+        show_score_badge: bool = True,
     ):
         super().__init__(top_k, include_abstract)
         self.webhook = webhook
         self.secret = secret
         self.use_card = use_card
+        self.card_style = (card_style or "magazine").strip().lower()
+        self.abstract_preview_chars = max(80, int(abstract_preview_chars or 180))
+        self.show_authors = show_authors
+        self.show_keywords = show_keywords
+        self.show_reason = show_reason
+        self.show_score_badge = show_score_badge
 
     def _build_sign(self) -> tuple[str, str]:
         timestamp = str(int(time.time()))
@@ -205,142 +260,547 @@ class FeishuNotifier(BaseNotifier):
         sign = base64.b64encode(hmac_code).decode("utf-8")
         return timestamp, sign
 
-    def _build_card_payload(self, papers: List[Paper]) -> dict:
-        """构建飞书消息卡片 payload - 完整信息版."""
-        today = datetime.now().strftime("%Y-%m-%d")
-        stats = _get_papers_stats(papers)
+    def _score_badge(self, score: float) -> tuple[str, str]:
+        if score >= 5:
+            return "🔥", "High match"
+        if score >= 3:
+            return "⭐", "Medium match"
+        return "📄", "Basic match"
 
-        # 构建论文元素列表
-        elements = []
+    def _format_reason(self, reason: str) -> str:
+        reason_text = (reason or "").strip()
+        if not reason_text:
+            return ""
 
-        # 统计信息
-        elements.append({
+        lowered = reason_text.lower()
+        if lowered.startswith("fallback (llm config error"):
+            return "Rule fallback scoring (LLM key/config missing)"
+        if lowered.startswith("fallback (llm batch error"):
+            return "Rule fallback scoring (LLM batch error)"
+        if lowered.startswith("fallback (rule-only"):
+            return "Rule-only output (LLM not called)"
+        if lowered.startswith("fallback"):
+            return "Rule fallback scoring"
+        return reason_text
+
+    def _format_recall_hits(self, hits: List[str], *, max_items: int = 4) -> str:
+        clean_hits = [str(h).strip() for h in hits if str(h).strip()]
+        if not clean_hits:
+            return ""
+        if len(clean_hits) <= max_items:
+            return ", ".join(clean_hits)
+        remain = len(clean_hits) - max_items
+        return f"{', '.join(clean_hits[:max_items])} +{remain} more"
+
+    def _build_header(self, *, title: str, subtitle: str, template: str = "blue") -> dict:
+        return {
+            "header": {
+                "template": template,
+                "title": {"tag": "plain_text", "content": title},
+                "subtitle": {"tag": "plain_text", "content": subtitle},
+            },
+            "elements": [],
+        }
+
+    def _build_stats_block(self, *, total: int, stats: dict) -> dict:
+        return {
             "tag": "div",
             "text": {
                 "tag": "lark_md",
-                "content": f"📊 **今日推荐 {len(papers)} 篇** | 平均分: {stats['avg_score']:.1f} | 分数范围: {stats['min_score']:.1f}-{stats['max_score']:.1f}"
-            }
-        })
+                "content": (
+                    f"📊 **Top {total} papers today** · avg score `{stats['avg_score']:.1f}` "
+                    f"· range `{stats['min_score']:.1f} ~ {stats['max_score']:.1f}`"
+                ),
+            },
+        }
 
+    def _build_action_row(
+        self,
+        *,
+        entry_url: str,
+        pdf_url: str,
+        detail_url: str = "",
+    ) -> dict:
+        actions = []
+
+        if entry_url:
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "Open arXiv"},
+                    "type": "default",
+                    "url": entry_url,
+                }
+            )
+
+        if pdf_url:
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "Open PDF"},
+                    "type": "default",
+                    "url": pdf_url,
+                }
+            )
+
+        if detail_url:
+            actions.append(
+                {
+                    "tag": "button",
+                    "text": {"tag": "plain_text", "content": "Details"},
+                    "type": "default",
+                    "url": detail_url,
+                }
+            )
+
+        return {"tag": "action", "actions": actions} if actions else {"tag": "hr"}
+
+    def _build_paper_content(self, paper: Paper, *, idx: int, preview_chars: int) -> str:
+        score = float(paper.score or 0.0)
+        emoji, score_label = self._score_badge(score)
+
+        title_md = f"[{paper.title}]({paper.entry_url})" if paper.entry_url else paper.title
+        lines = [f"{emoji} **{idx}. {title_md}**"]
+
+        meta_chunks = [f"ID: `{paper.arxiv_id}`"] if paper.arxiv_id else []
+        if self.show_score_badge:
+            meta_chunks.append(f"`{score:.1f}` {score_label}")
+        if paper.primary_category:
+            meta_chunks.append(f"`{paper.primary_category}`")
+        if self.show_keywords and paper.matched_keywords:
+            meta_chunks.append(f"keywords: {', '.join(paper.matched_keywords[:4])}")
+        if meta_chunks:
+            lines.append(" · ".join(meta_chunks))
+
+        if self.show_authors and paper.authors:
+            authors = ", ".join(paper.authors[:3])
+            if len(paper.authors) > 3:
+                authors += f" (+{len(paper.authors) - 3} more)"
+            lines.append(f"Authors: {authors}")
+
+        if paper.published:
+            pub = paper.published.strftime("%Y-%m-%d") if hasattr(paper.published, "strftime") else str(paper.published)[:10]
+            lines.append(f"Published: {pub}")
+
+        extra_meta = []
+        if paper.doi:
+            extra_meta.append(f"DOI: {paper.doi}")
+        if paper.journal_ref:
+            extra_meta.append(f"Journal: {_truncate_text(paper.journal_ref, 80)}")
+        if extra_meta:
+            lines.append(" · ".join(extra_meta))
+
+        if self.include_abstract and paper.abstract:
+            lines.append(f"Abstract: {_truncate_text(paper.abstract, preview_chars)}")
+
+        if self.show_reason and paper.summary:
+            if isinstance(paper.summary, dict):
+                reason = paper.summary.get("one_sentence_highlight") or paper.summary.get("core_method") or ""
+                if reason:
+                    lines.append(f"Highlight: {_truncate_text(str(reason), preview_chars)}")
+            elif isinstance(paper.summary, str):
+                lines.append(f"Highlight: {_truncate_text(paper.summary, preview_chars)}")
+
+        return "\n".join(lines)
+
+    def _build_card_payload(self, papers: List[Paper], *, preview_chars: int) -> dict:
+        today = datetime.now().strftime("%Y-%m-%d")
+        stats = _get_papers_stats(papers)
+
+        card = self._build_header(
+            title=f"📚 arXiv Paper Daily ({today})",
+            subtitle="Magazine Card · quick scan + deep links",
+            template="blue",
+        )
+        elements = card["elements"]
+        elements.append(self._build_stats_block(total=len(papers), stats=stats))
         elements.append({"tag": "hr"})
 
-        # 论文列表
         for idx, paper in enumerate(papers, start=1):
-            # 分数 emoji
-            if paper.score >= 5:
-                score_emoji = "🔥"
-                score_label = "高度匹配"
-            elif paper.score >= 3:
-                score_emoji = "⭐"
-                score_label = "中度匹配"
-            else:
-                score_emoji = "📄"
-                score_label = "一般匹配"
-
-            # 标题
-            content = f"{score_emoji} **{idx}. {paper.title}**\n\n"
-
-            # 分数详情
-            content += f"**匹配分数:** `{paper.score:.1f}` ({score_label})\n"
-
-            # 关键词
-            if paper.matched_keywords:
-                keywords = ", ".join(paper.matched_keywords[:5])
-                content += f"**命中关键词:** {keywords}\n"
-
-            # 作者
-            if paper.authors:
-                authors = ", ".join(paper.authors[:3])
-                if len(paper.authors) > 3:
-                    authors += f" 等 {len(paper.authors)} 人"
-                content += f"**作者:** {authors}\n"
-
-            # 分类
-            if paper.primary_category:
-                categories = paper.primary_category
-                if paper.categories and len(paper.categories) > 1:
-                    other_cats = [c for c in paper.categories[:3] if c != paper.primary_category]
-                    if other_cats:
-                        categories += f" ({', '.join(other_cats)})"
-                content += f"**分类:** {categories}\n"
-
-            # 发布日期
-            if paper.published:
-                pub_date = paper.published.strftime("%Y-%m-%d") if hasattr(paper.published, 'strftime') else str(paper.published)[:10]
-                content += f"**发布日期:** {pub_date}\n"
-
-            content += "\n"
-
-            # 摘要 (可选)
-            if self.include_abstract and paper.abstract:
-                abstract = _truncate_text(paper.abstract, 300)
-                content += f"**摘要:**\n{abstract}\n\n"
-
-            # AI 生成的摘要/亮点 (如果有)
-            if hasattr(paper, 'summary') and paper.summary:
-                if isinstance(paper.summary, dict):
-                    if paper.summary.get('one_sentence_highlight'):
-                        content += f"**💡 一句话亮点:** {paper.summary['one_sentence_highlight']}\n"
-                    if paper.summary.get('core_method'):
-                        content += f"**🔧 核心方法:** {paper.summary['core_method']}\n"
-                elif isinstance(paper.summary, str):
-                    content += f"**💡 AI 摘要:** {paper.summary}\n"
-                content += "\n"
-
-            # 链接
-            content += f"[📄 arXiv 页面]({paper.entry_url})"
-            if paper.pdf_url:
-                content += f"  |  [📥 PDF 下载]({paper.pdf_url})"
-
-            elements.append({
-                "tag": "div",
-                "text": {
-                    "tag": "lark_md",
-                    "content": content
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": self._build_paper_content(paper, idx=idx, preview_chars=preview_chars),
+                    },
                 }
-            })
-
+            )
+            elements.append(
+                self._build_action_row(
+                    entry_url=paper.entry_url,
+                    pdf_url=paper.pdf_url,
+                )
+            )
             if idx < len(papers):
                 elements.append({"tag": "hr"})
 
-        # 底部说明
-        elements.append({
-            "tag": "note",
-            "elements": [
-                {
-                    "tag": "plain_text",
-                    "content": f"🤖 arXiv Paper Bot | {today} | 关键词过滤 + AI 评分"
-                }
-            ]
-        })
-
-        card = {
-            "header": {
-                "template": "blue",
-                "title": {
-                    "tag": "plain_text",
-                    "content": f"📚 arXiv 论文日报 ({today})"
-                }
-            },
-            "elements": elements
-        }
-
+        elements.append(
+            {
+                "tag": "note",
+                "elements": [
+                    {
+                        "tag": "plain_text",
+                        "content": f"🤖 arXiv Paper Bot | {today} | keyword recall + agent scoring",
+                    }
+                ],
+            }
+        )
         return card
+
+    def _build_daily_topics_card_payload(
+        self,
+        grouped_output: dict,
+        *,
+        per_topic: int,
+        include_empty_topics: bool,
+        abstract_chars: int,
+        reason_chars: int,
+        include_reason: bool,
+        include_abstract: bool,
+    ) -> dict:
+        day = grouped_output.get("day") or datetime.now().strftime("%Y-%m-%d")
+        timezone_name = grouped_output.get("timezone") or "Asia/Shanghai"
+        threshold = grouped_output.get("threshold")
+        topics = grouped_output.get("topics") or []
+
+        total_kept = sum(int(topic.get("count") or 0) for topic in topics)
+        card_part = grouped_output.get("card_part")
+        card_total = grouped_output.get("card_total")
+        part_suffix = f" | Card {card_part}/{card_total}" if card_part and card_total else ""
+
+        card = self._build_header(
+            title=f"arXiv Topic Daily ({day}){part_suffix}",
+            subtitle=f"{timezone_name} | 7 topics | up to {per_topic} papers/topic",
+            template="wathet",
+        )
+        elements = card["elements"]
+
+        threshold_text = f"{float(threshold):.2f}" if threshold is not None else "N/A"
+        llm_enabled = grouped_output.get("llm_enabled")
+        if llm_enabled is False:
+            llm_mode = "Rule fallback"
+        elif llm_enabled is True:
+            llm_mode = "LLM adjudication"
+        else:
+            llm_mode = "Unknown"
+
+        elements.append(
+            {
+                "tag": "div",
+                "text": {
+                    "tag": "lark_md",
+                    "content": (
+                        f"📊 **Selected {total_kept} papers** | threshold `{threshold_text}` | mode `{llm_mode}`"
+                    ),
+                },
+            }
+        )
+        if llm_enabled is False:
+            elements.append(
+                {
+                    "tag": "note",
+                    "elements": [
+                        {
+                            "tag": "plain_text",
+                            "content": "LLM is unavailable. The card uses rule fallback scoring.",
+                        }
+                    ],
+                }
+            )
+        elements.append({"tag": "hr"})
+
+        for topic in topics:
+            topic_id = topic.get("topic_id", "-")
+            topic_name = str(topic.get("topic") or "Unknown Topic")
+            topic_count = int(topic.get("count") or 0)
+            papers = topic.get("papers") or []
+
+            if topic_count == 0 and not include_empty_topics:
+                continue
+
+            elements.append(
+                {
+                    "tag": "div",
+                    "text": {
+                        "tag": "lark_md",
+                        "content": f"**📂 Topic {topic_id}: {topic_name} ({topic_count})**",
+                    },
+                }
+            )
+
+            if not papers:
+                elements.append(
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "- No selected papers today."},
+                    }
+                )
+                elements.append({"tag": "hr"})
+                continue
+
+            topic_slice = papers[:per_topic]
+            for idx, paper in enumerate(topic_slice, start=1):
+                relevance = float(paper.get("relevance") or 0.0)
+                confidence = float(paper.get("confidence") or 0.0)
+                title = str(paper.get("title") or "Untitled")
+                subtopic = str(paper.get("subtopic") or "")
+                reason = str(paper.get("reason") or "")
+                one_sentence_summary = str(paper.get("one_sentence_summary") or "")
+                paper_id = str(paper.get("paper_id") or paper.get("arxiv_id") or "")
+                primary_category = str(paper.get("primary_category") or "")
+                categories = [str(c) for c in (paper.get("categories") or []) if c]
+                authors = [str(a) for a in (paper.get("authors") or []) if a]
+                published = str(paper.get("published") or "")
+                updated = str(paper.get("updated") or "")
+                abstract = str(paper.get("abstract") or "")
+                doi = str(paper.get("doi") or "")
+                journal_ref = str(paper.get("journal_ref") or "")
+                comment = str(paper.get("comment") or "")
+                topic_of_paper = str(paper.get("topic") or topic_name)
+                entry_url = str(paper.get("entry_url") or "")
+                pdf_url = str(paper.get("pdf_url") or "")
+                recall_hits = [str(h) for h in (paper.get("recall_hits") or []) if h]
+                recall_hit_count = int(paper.get("recall_hit_count") or len(recall_hits))
+
+                title_md = f"[{title}]({entry_url})" if entry_url else title
+                lines = [f"**{idx}. {title_md}**"]
+
+                meta_line = [
+                    f"`🆔 {paper_id or 'N/A'}`",
+                    f"`🎯 Rel {relevance:.2f}`",
+                    f"`🔒 Conf {confidence:.2f}`",
+                    f"`🏷️ {primary_category or 'N/A'}`",
+                ]
+                lines.append(" | ".join(meta_line))
+                lines.append("📌 **Routing**")
+                lines.append(f"- **Topic:** `{topic_id}` {topic_of_paper}")
+                lines.append(f"- **Subtopic:** {subtopic or 'Unspecified'}")
+
+                lines.append("🔗 **Source** · Use the title link above")
+
+                lines.append("")
+                lines.append("🧠 **LLM Judgment**")
+
+                if one_sentence_summary:
+                    lines.append(f"- **1-sentence summary:** {one_sentence_summary}")
+
+                if include_reason and self.show_reason:
+                    formatted_reason = self._format_reason(reason)
+                    if formatted_reason:
+                        lines.append(f"- **Rationale:** {_truncate_text(formatted_reason, reason_chars)}")
+
+                lines.append("")
+                lines.append("📚 **Paper Info**")
+
+                if self.show_authors:
+                    author_text = ", ".join(authors[:4]) if authors else "N/A"
+                    if authors and len(authors) > 4:
+                        author_text += f" (+{len(authors) - 4} more)"
+                    lines.append(f"- **Authors:** {author_text}")
+
+                category_text = ", ".join(categories) if categories else "N/A"
+                pub_text = published[:10] if published else "N/A"
+                upd_text = updated[:10] if updated else "N/A"
+                lines.append(f"- **Categories:** {category_text}")
+                lines.append(f"- **Published / Updated:** {pub_text} / {upd_text}")
+
+                journal_text = _truncate_text(journal_ref, 120) if journal_ref else "N/A"
+                comment_text = _truncate_text(comment, 140) if comment else "N/A"
+                lines.append(f"- **DOI / Journal / Comment:** {doi or 'N/A'} | {journal_text} | {comment_text}")
+
+                if self.show_keywords:
+                    hit_text = ", ".join(recall_hits) if recall_hits else "none"
+                    lines.append(f"- **Recall hits ({recall_hit_count}):** {hit_text}")
+                else:
+                    lines.append(f"- **Recall hit count:** {recall_hit_count}")
+
+                if include_abstract:
+                    lines.append("")
+                    if abstract:
+                        if abstract_chars > 0:
+                            lines.append(f"📝 **Abstract (first {abstract_chars} chars)**")
+                            lines.append(_truncate_text(abstract, abstract_chars))
+                        else:
+                            lines.append("📝 **Abstract (full)**")
+                            lines.append(abstract)
+                    else:
+                        lines.append("📝 **Abstract:** N/A")
+
+                elements.append(
+                    {
+                        "tag": "div",
+                        "text": {"tag": "lark_md", "content": "\n".join(lines)},
+                    }
+                )
+                if idx < len(topic_slice):
+                    elements.append({"tag": "hr"})
+
+            elements.append({"tag": "hr"})
+
+        elements.append(
+            {
+                "tag": "note",
+                "elements": [
+                    {
+                        "tag": "plain_text",
+                        "content": "Tip: Paper title is the only link entry (to avoid duplicate link blocks).",
+                    }
+                ],
+            }
+        )
+        return card
+
+    def _card_size_bytes(self, card: dict) -> int:
+        return len(json.dumps(card, ensure_ascii=False).encode("utf-8"))
+
+    def _build_topk_card_with_fallback(self, papers: List[Paper]) -> Optional[dict]:
+        for preview_chars in [self.abstract_preview_chars, 140, 100]:
+            card = self._build_card_payload(papers, preview_chars=preview_chars)
+            if self._card_size_bytes(card) <= FEISHU_CARD_SAFE_BYTES:
+                return card
+        return None
+
+    def _build_daily_card_with_fallback(
+        self,
+        grouped_output: dict,
+        *,
+        per_topic: int,
+        include_empty_topics: bool,
+        abstract_preview_chars: int,
+    ) -> Optional[dict]:
+        include_abstract_default = bool(self.include_abstract)
+        if abstract_preview_chars <= 0:
+            # Prioritize full abstracts; reduce paper count before truncating abstract text.
+            attempts = [
+                (per_topic, 0, 140, True, include_abstract_default),
+                (max(1, min(per_topic, 2)), 0, 120, True, include_abstract_default),
+                (1, 0, 100, True, include_abstract_default),
+                (1, 0, 80, False, include_abstract_default),
+                (1, 0, 80, False, False),
+            ]
+        else:
+            attempts = [
+                (per_topic, abstract_preview_chars, 140, True, include_abstract_default),
+                (per_topic, min(160, abstract_preview_chars), 120, True, include_abstract_default),
+                (per_topic, min(110, abstract_preview_chars), 100, True, include_abstract_default),
+                (max(1, min(per_topic, 2)), min(90, abstract_preview_chars), 90, False, include_abstract_default),
+                (max(1, min(per_topic, 2)), 0, 80, False, False),
+            ]
+        for size, abstract_chars, reason_chars, include_reason, include_abstract in attempts:
+            card = self._build_daily_topics_card_payload(
+                grouped_output,
+                per_topic=size,
+                include_empty_topics=include_empty_topics,
+                abstract_chars=abstract_chars,
+                reason_chars=reason_chars,
+                include_reason=include_reason,
+                include_abstract=include_abstract,
+            )
+            if self._card_size_bytes(card) <= FEISHU_CARD_SAFE_BYTES:
+                return card
+        return None
+
+    def _post_payload(self, payload: dict) -> None:
+        response = requests.post(self.webhook, json=payload, timeout=10)
+        _raise_for_status(response)
+
+        data = response.json()
+        if data.get("code") != 0:
+            raise NotificationError(f"Feishu send failed: {data}")
+
+    def _split_grouped_output_for_cards(self, grouped_output: dict, *, num_cards: int = 2) -> List[dict]:
+        topics = list(grouped_output.get("topics") or [])
+        if not topics or num_cards <= 1:
+            return [grouped_output]
+
+        total_topics = len(topics)
+        first_size = (total_topics + 1) // 2
+        chunks = [topics[:first_size], topics[first_size:]]
+
+        outputs: List[dict] = []
+        non_empty_chunks = [chunk for chunk in chunks if chunk]
+        total_cards = len(non_empty_chunks)
+        for idx, chunk in enumerate(non_empty_chunks, start=1):
+            piece = dict(grouped_output)
+            piece["topics"] = chunk
+            piece["card_part"] = idx
+            piece["card_total"] = total_cards
+            outputs.append(piece)
+        return outputs or [grouped_output]
+
+    def send_daily_topics(
+        self,
+        grouped_output: dict,
+        *,
+        per_topic: int = 3,
+        include_empty_topics: bool = True,
+        abstract_preview_chars: int = 0,
+    ) -> None:
+        """Send daily 7-topic card."""
+        timestamp, sign = self._build_sign()
+        if not self.use_card:
+            payload = {
+                "timestamp": timestamp,
+                "sign": sign,
+                "msg_type": "text",
+                "content": {"text": _format_daily_topics_digest(grouped_output, per_topic=per_topic)},
+            }
+            self._post_payload(payload)
+            logger.info("%s daily topic push completed", self.provider_name)
+            return
+
+        requested_abstract_chars = 0 if abstract_preview_chars is None else int(abstract_preview_chars)
+        normalized_abstract_chars = 0 if requested_abstract_chars <= 0 else max(80, requested_abstract_chars)
+
+        grouped_parts = self._split_grouped_output_for_cards(grouped_output, num_cards=2)
+        for part in grouped_parts:
+            card = self._build_daily_card_with_fallback(
+                part,
+                per_topic=max(1, int(per_topic)),
+                include_empty_topics=include_empty_topics,
+                abstract_preview_chars=normalized_abstract_chars,
+            )
+
+            if card is None:
+                payload = {
+                    "timestamp": timestamp,
+                    "sign": sign,
+                    "msg_type": "text",
+                    "content": {"text": _format_daily_topics_digest(part, per_topic=2)},
+                }
+            else:
+                payload = {
+                    "timestamp": timestamp,
+                    "sign": sign,
+                    "msg_type": "interactive",
+                    "card": card,
+                }
+
+            self._post_payload(payload)
+
+        logger.info("%s daily topic push completed", self.provider_name)
 
     def _send_message(self, message: str, papers: List[Paper] = None) -> None:
         timestamp, sign = self._build_sign()
 
         if self.use_card and papers:
-            # 使用消息卡片格式
-            card = self._build_card_payload(papers)
-            payload = {
-                "timestamp": timestamp,
-                "sign": sign,
-                "msg_type": "interactive",
-                "card": card,
-            }
+            card = self._build_topk_card_with_fallback(papers)
+            if card is not None:
+                payload = {
+                    "timestamp": timestamp,
+                    "sign": sign,
+                    "msg_type": "interactive",
+                    "card": card,
+                }
+            else:
+                payload = {
+                    "timestamp": timestamp,
+                    "sign": sign,
+                    "msg_type": "text",
+                    "content": {"text": message},
+                }
         else:
-            # 使用纯文本格式
             payload = {
                 "timestamp": timestamp,
                 "sign": sign,
@@ -348,17 +808,11 @@ class FeishuNotifier(BaseNotifier):
                 "content": {"text": message},
             }
 
-        response = requests.post(self.webhook, json=payload, timeout=10)
-        _raise_for_status(response)
-
-        # 检查飞书返回的错误码
-        data = response.json()
-        if data.get("code") != 0:
-            raise NotificationError(f"飞书发送失败: {data}")
+        self._post_payload(payload)
 
 
 class TelegramNotifier(BaseNotifier):
-    """Telegram Bot 推送 - 支持 MarkdownV2 格式."""
+    """Telegram notifier with MarkdownV2 support."""
 
     provider_name = "Telegram"
 
@@ -376,36 +830,36 @@ class TelegramNotifier(BaseNotifier):
         self.use_markdown = use_markdown
 
     def _build_markdown_message(self, papers: List[Paper]) -> str:
-        """构建 Telegram MarkdownV2 格式消息."""
+        """Build Telegram MarkdownV2 message."""
         today = datetime.now().strftime("%Y\\-%-m\\-%d")
         stats = _get_papers_stats(papers)
 
         lines = []
-        lines.append(f"📚 *arXiv 论文日报* \\({today}\\)")
+        lines.append(f"📚 *arXiv Paper Daily* \\({today}\\)")
         lines.append("")
         lines.append(
-            f"📊 今日推荐 *{len(papers)}* 篇 \\| "
-            f"平均分: {stats['avg_score']:.1f} \\| "
-            f"范围: {stats['min_score']:.1f}\\-{stats['max_score']:.1f}"
+            f"📊 Top *{len(papers)}* papers \\| "
+            f"Avg score: {stats['avg_score']:.1f} \\| "
+            f"Range: {stats['min_score']:.1f}\\-{stats['max_score']:.1f}"
         )
         lines.append("─" * 20)
 
         for idx, paper in enumerate(papers, start=1):
-            keywords = ", ".join(paper.matched_keywords[:3]) if paper.matched_keywords else "无关键词"
+            keywords = ", ".join(paper.matched_keywords[:3]) if paper.matched_keywords else "none"
             score_emoji = "🔥" if paper.score >= 5 else "⭐" if paper.score >= 3 else "📄"
 
-            # 转义标题中的特殊字符
+            # Escape special characters in title.
             title_escaped = _escape_telegram_markdown(paper.title)
 
             lines.append(f"{score_emoji} *{idx}\\. {title_escaped}*")
-            lines.append(f"分数: `{paper.score:.1f}` \\| 关键词: {_escape_telegram_markdown(keywords)}")
+            lines.append(f"Score: `{paper.score:.1f}` \\| Keywords: {_escape_telegram_markdown(keywords)}")
 
             if self.include_abstract and paper.abstract:
                 abstract = _truncate_text(paper.abstract, 120)
                 lines.append(f"_{_escape_telegram_markdown(abstract)}_")
 
-            # 链接
-            lines.append(f"[📎 查看论文]({paper.entry_url})")
+            # Link
+            lines.append(f"[📎 Open paper]({paper.entry_url})")
             lines.append("")
 
         lines.append("🤖 _arXiv Paper Bot_")
@@ -433,14 +887,14 @@ class TelegramNotifier(BaseNotifier):
         response = requests.post(url, json=payload, timeout=10)
         _raise_for_status(response)
 
-        # 检查 Telegram 返回的错误
+        # Validate Telegram API response.
         data = response.json()
         if not data.get("ok"):
-            raise NotificationError(f"Telegram 发送失败: {data}")
+            raise NotificationError(f"Telegram send failed: {data}")
 
 
 class WeChatNotifier(BaseNotifier):
-    """微信公众号客服消息推送 - 支持图文消息."""
+    """WeChat service message notifier with news-card support."""
 
     provider_name = "WeChat"
 
@@ -472,36 +926,32 @@ class WeChatNotifier(BaseNotifier):
         data = response.json()
         token = data.get("access_token")
         if not token:
-            raise NotificationError(f"获取 access_token 失败: {data}")
+            raise NotificationError(f"Failed to fetch access_token: {data}")
         return token
 
     def _build_news_payload(self, papers: List[Paper]) -> dict:
-        """构建图文消息 payload (最多8条)."""
+        """Build news payload (WeChat limit: 8 items)."""
         articles = []
 
-        for paper in papers[:8]:  # 微信限制最多8条
-            # 构建描述
+        for paper in papers[:8]:  # WeChat allows at most 8 items.
+            # Build article description.
             keywords = ", ".join(paper.matched_keywords[:3]) if paper.matched_keywords else ""
-            description = f"分数: {paper.score:.1f}"
+            description = f"Score: {paper.score:.1f}"
             if keywords:
-                description += f" | 关键词: {keywords}"
+                description += f" | Keywords: {keywords}"
             if self.include_abstract and paper.abstract:
                 description += f"\n{_truncate_text(paper.abstract, 100)}"
 
-            articles.append({
-                "title": paper.title,
-                "description": description,
-                "url": paper.entry_url,
-                "picurl": "",  # 可选：论文封面图 URL
-            })
+            articles.append(
+                {
+                    "title": paper.title,
+                    "description": description,
+                    "url": paper.entry_url,
+                    "picurl": "",  # Optional cover image URL.
+                }
+            )
 
-        return {
-            "touser": self.open_id,
-            "msgtype": "news",
-            "news": {
-                "articles": articles
-            }
-        }
+        return {"touser": self.open_id, "msgtype": "news", "news": {"articles": articles}}
 
     def _send_message(self, message: str, papers: List[Paper] = None) -> None:
         access_token = self._fetch_access_token()
@@ -511,10 +961,10 @@ class WeChatNotifier(BaseNotifier):
         )
 
         if self.use_news and papers:
-            # 使用图文消息格式
+            # Use news-card payload.
             payload = self._build_news_payload(papers)
         else:
-            # 使用纯文本格式
+            # Use plain-text payload.
             payload = {
                 "touser": self.open_id,
                 "msgtype": "text",
@@ -525,11 +975,11 @@ class WeChatNotifier(BaseNotifier):
         _raise_for_status(response)
         data = response.json()
         if data.get("errcode") != 0:
-            raise NotificationError(f"微信发送失败: {data}")
+            raise NotificationError(f"WeChat send failed: {data}")
 
 
 def _raise_for_status(response: requests.Response) -> None:
     try:
         response.raise_for_status()
-    except requests.HTTPError as exc:  # pragma: no cover - requests封装
-        raise NotificationError(f"HTTP 请求失败: {exc}") from exc
+    except requests.HTTPError as exc:  # pragma: no cover - requests wrapper
+        raise NotificationError(f"HTTP request failed: {exc}") from exc

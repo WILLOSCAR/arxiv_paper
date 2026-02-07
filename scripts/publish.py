@@ -1,50 +1,47 @@
 #!/usr/bin/env python3
 """微信公众号发布工具 - 将论文发布为公众号图文文章.
 
-使用方法:
-    # 1. 上传封面图片
+Usage:
+    # 1) 上传封面图
     python scripts/publish.py upload-cover path/to/cover.jpg
 
-    # 2. 发布论文到草稿箱
-    python scripts/publish.py publish --cover MEDIA_ID
+    # 2) 从 daily pipeline 输出发布
+    python scripts/publish.py publish --cover MEDIA_ID --input data/index/YYYY-MM-DD/daily_topics.json
 
-    # 3. 发布并自动推送
+    # 3) 发布并自动推送
     python scripts/publish.py publish --cover MEDIA_ID --auto
-
-    # 4. 从 JSON 文件发布
-    python scripts/publish.py publish --cover MEDIA_ID --input data/papers.json
 """
+
+from __future__ import annotations
 
 import argparse
 import json
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import yaml
 
-# 添加项目根目录到路径
+# Add project root to import path.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.models import Paper
-from src.publisher import WeChatPublisher, PublisherConfig, PublishError
+from src.publisher import PublishError, PublisherConfig, WeChatPublisher
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-)
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
 
 
 def load_config() -> dict:
-    """加载配置文件."""
+    """Load config YAML."""
     config_path = Path(__file__).parent.parent / "config" / "config.yaml"
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
 
 def create_publisher(config: dict) -> WeChatPublisher:
-    """创建发布器实例."""
+    """Create WeChat publisher instance."""
     pub_config = config.get("publisher", {})
     wechat = pub_config.get("wechat", {})
 
@@ -66,45 +63,97 @@ def create_publisher(config: dict) -> WeChatPublisher:
     )
 
 
-def load_papers(input_path: str) -> list:
-    """从 JSON 文件加载论文."""
+def _parse_datetime(value: str | None) -> datetime:
+    if not value:
+        return datetime.now()
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return datetime.now()
+
+
+def _flatten_daily_topics(payload: dict) -> list[dict]:
+    rows: list[dict] = []
+    topics = payload.get("topics") or []
+    for topic in topics:
+        for paper in topic.get("papers") or []:
+            rows.append(
+                {
+                    "arxiv_id": paper.get("paper_id", ""),
+                    "title": paper.get("title", ""),
+                    "abstract": paper.get("abstract", ""),
+                    "authors": paper.get("authors", []),
+                    "primary_category": paper.get("primary_category", ""),
+                    "categories": paper.get("categories", []),
+                    "pdf_url": paper.get("pdf_url", ""),
+                    "entry_url": paper.get("entry_url", ""),
+                    "published": paper.get("published"),
+                    "updated": paper.get("updated"),
+                    "score": paper.get("relevance", 0),
+                    "matched_keywords": paper.get("recall_hits", []),
+                }
+            )
+    return rows
+
+
+def load_papers(input_path: str) -> list[Paper]:
+    """Load papers from legacy list JSON or daily_topics grouped JSON."""
     with open(input_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
-    papers = []
-    for item in data:
-        paper = Paper(
-            arxiv_id=item.get("arxiv_id", ""),
-            title=item.get("title", ""),
-            abstract=item.get("abstract", ""),
-            authors=item.get("authors", []),
-            primary_category=item.get("primary_category", ""),
-            categories=item.get("categories", []),
-            pdf_url=item.get("pdf_url", ""),
-            entry_url=item.get("entry_url", ""),
-            published=None,
-            updated=None,
-            score=item.get("score", 0),
-            matched_keywords=item.get("matched_keywords", []),
+    if isinstance(data, list):
+        rows = data
+    elif isinstance(data, dict) and isinstance(data.get("topics"), list):
+        rows = _flatten_daily_topics(data)
+    else:
+        raise ValueError("Unsupported JSON format. Expected papers list or daily_topics JSON")
+
+    papers: list[Paper] = []
+    for item in rows:
+        papers.append(
+            Paper(
+                arxiv_id=item.get("arxiv_id", ""),
+                title=item.get("title", ""),
+                abstract=item.get("abstract", ""),
+                authors=item.get("authors", []),
+                primary_category=item.get("primary_category", ""),
+                categories=item.get("categories", []),
+                pdf_url=item.get("pdf_url", ""),
+                entry_url=item.get("entry_url", ""),
+                published=_parse_datetime(item.get("published")),
+                updated=_parse_datetime(item.get("updated")),
+                score=item.get("score", 0),
+                matched_keywords=item.get("matched_keywords", []),
+            )
         )
-        papers.append(paper)
 
     return papers
 
 
-def cmd_upload_cover(args, config):
-    """上传封面图片."""
-    publisher = create_publisher(config)
+def _find_default_input_path(root: Path) -> Path | None:
+    daily_files = sorted((root / "data" / "index").glob("*/daily_topics.json"), reverse=True)
+    if daily_files:
+        return daily_files[0]
 
+    legacy = root / "data" / "papers.json"
+    if legacy.exists():
+        return legacy
+
+    return None
+
+
+def cmd_upload_cover(args, config):
+    """Upload a cover image and print media id."""
+    publisher = create_publisher(config)
     print(f"📤 上传封面图片: {args.image_path}")
 
     try:
         media_id = publisher.upload_image(args.image_path)
-        print(f"\n✅ 上传成功!")
+        print("\n✅ 上传成功!")
         print(f"   media_id: {media_id}")
-        print(f"\n💡 将此 media_id 添加到 config/config.yaml:")
-        print(f"   publisher:")
-        print(f"     wechat:")
+        print("\n💡 可将此 media_id 写入 config/config.yaml:")
+        print("   publisher:")
+        print("     wechat:")
         print(f'       default_cover: "{media_id}"')
     except PublishError as e:
         print(f"❌ 上传失败: {e}")
@@ -112,31 +161,37 @@ def cmd_upload_cover(args, config):
 
 
 def cmd_publish(args, config):
-    """发布论文."""
+    """Publish papers to WeChat."""
     publisher = create_publisher(config)
+    project_root = Path(__file__).parent.parent
 
-    # 加载论文
     if args.input:
-        print(f"📖 从文件加载论文: {args.input}")
-        papers = load_papers(args.input)
+        input_path = Path(args.input)
     else:
-        # 默认从 data/papers.json 加载
-        default_path = Path(__file__).parent.parent / "data" / "papers.json"
-        if not default_path.exists():
-            print("❌ 错误: 未找到 data/papers.json，请先运行 python main.py 获取论文")
-            sys.exit(1)
-        print(f"📖 从默认路径加载论文: {default_path}")
-        papers = load_papers(str(default_path))
+        input_path = _find_default_input_path(project_root)
+
+    if not input_path or not input_path.exists():
+        print("❌ 错误: 未找到可发布论文文件")
+        print("   先运行日更主流程，例如:")
+        print("   python -m src.pipeline.run_daily --config config/config.yaml --day YYYY-MM-DD")
+        print("   或使用 --input 显式指定 JSON 文件")
+        sys.exit(1)
+
+    print(f"📖 从文件加载论文: {input_path}")
+
+    try:
+        papers = load_papers(str(input_path))
+    except Exception as exc:
+        print(f"❌ 加载论文失败: {exc}")
+        sys.exit(1)
 
     if not papers:
         print("❌ 错误: 没有可发布的论文")
         sys.exit(1)
 
-    # 限制数量
     papers = papers[: args.top_k]
     print(f"📚 准备发布 {len(papers)} 篇论文")
 
-    # 获取封面图
     thumb_media_id = args.cover or config.get("publisher", {}).get("wechat", {}).get("default_cover")
     if not thumb_media_id:
         print("❌ 错误: 缺少封面图 media_id")
@@ -144,7 +199,6 @@ def cmd_publish(args, config):
         print("   上传封面图: python scripts/publish.py upload-cover path/to/cover.jpg")
         sys.exit(1)
 
-    # 发布
     try:
         if args.auto:
             publisher.config.auto_publish = True
@@ -152,7 +206,7 @@ def cmd_publish(args, config):
 
         result = publisher.publish_papers(papers, thumb_media_id=thumb_media_id)
 
-        print(f"\n✅ 操作成功!")
+        print("\n✅ 操作成功!")
         print(f"   草稿 media_id: {result['media_id']}")
 
         if result.get("publish_id"):
@@ -160,7 +214,7 @@ def cmd_publish(args, config):
             print(f"   状态: {result['status']}")
             print("\n💡 发布需要一些时间，请在公众号后台查看发布状态")
         else:
-            print(f"   状态: 已保存到草稿箱")
+            print("   状态: 已保存到草稿箱")
             print("\n💡 请前往公众号后台 -> 草稿箱 查看并手动发布")
 
     except PublishError as e:
@@ -169,12 +223,12 @@ def cmd_publish(args, config):
 
 
 def cmd_status(args, config):
-    """查询发布状态."""
+    """Query publish task status."""
     publisher = create_publisher(config)
 
     try:
         status = publisher.get_publish_status(args.publish_id)
-        print(f"📊 发布状态:")
+        print("📊 发布状态:")
         print(json.dumps(status, indent=2, ensure_ascii=False))
     except PublishError as e:
         print(f"❌ 查询失败: {e}")
@@ -190,18 +244,15 @@ def main():
 
     subparsers = parser.add_subparsers(dest="command", help="可用命令")
 
-    # upload-cover 命令
     upload_parser = subparsers.add_parser("upload-cover", help="上传封面图片")
     upload_parser.add_argument("image_path", help="图片文件路径")
 
-    # publish 命令
     publish_parser = subparsers.add_parser("publish", help="发布论文到公众号")
     publish_parser.add_argument("--cover", help="封面图 media_id")
     publish_parser.add_argument("--input", "-i", help="论文 JSON 文件路径")
     publish_parser.add_argument("--top-k", type=int, default=10, help="发布论文数量 (默认: 10)")
     publish_parser.add_argument("--auto", action="store_true", help="自动发布 (不只是保存草稿)")
 
-    # status 命令
     status_parser = subparsers.add_parser("status", help="查询发布状态")
     status_parser.add_argument("publish_id", help="发布任务 ID")
 

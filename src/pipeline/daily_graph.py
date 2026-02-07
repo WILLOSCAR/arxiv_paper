@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional, TypedDict
@@ -36,6 +37,87 @@ def _strip_code_fences(text: str) -> str:
 
 def _chunk(items: List[dict], size: int) -> List[List[dict]]:
     return [items[i : i + size] for i in range(0, len(items), size)]
+
+
+def _extract_first_json_array(text: str) -> str:
+    """Extract first top-level JSON array from a mixed LLM response string."""
+    src = text or ""
+    start = src.find("[")
+    if start < 0:
+        return ""
+
+    depth = 0
+    in_string = False
+    escaped = False
+    for idx in range(start, len(src)):
+        ch = src[idx]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif ch == "\\":
+                escaped = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == "[":
+            depth += 1
+            continue
+        if ch == "]":
+            depth -= 1
+            if depth == 0:
+                return src[start : idx + 1]
+
+    return ""
+
+
+def _parse_json_array_from_llm(content: str) -> List[dict]:
+    """Parse LLM output and normalize to a JSON list of objects."""
+    text = _strip_code_fences(content)
+    if not text:
+        raise ValueError("Empty LLM output")
+
+    candidates = [text]
+    extracted = _extract_first_json_array(text)
+    if extracted and extracted != text:
+        candidates.append(extracted)
+
+    for candidate in candidates:
+        try:
+            parsed = json.loads(candidate)
+        except Exception:
+            continue
+
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            for key in ("results", "papers", "output", "data"):
+                value = parsed.get(key)
+                if isinstance(value, list):
+                    return value
+
+    raise ValueError("LLM output is not a JSON array")
+
+
+def _one_sentence_summary(text: str, *, max_chars: int = 260) -> str:
+    raw = (text or "").strip()
+    if not raw:
+        return ""
+
+    sentence = raw.split("\n", 1)[0].strip()
+    for sep in ["。", "！", "？", ". ", "! ", "? "]:
+        if sep in sentence:
+            sentence = sentence.split(sep, 1)[0].strip()
+            break
+
+    if not sentence:
+        return ""
+    if len(sentence) > max_chars:
+        return sentence[: max_chars - 3].rstrip() + "..."
+    return sentence
 
 
 def _default_headers(llm_cfg: dict) -> dict[str, str] | None:
@@ -205,23 +287,39 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
     if not papers:
         return {"scored_papers": []}
 
-    def _consistent(a: dict, b: dict) -> bool:
-        """Heuristic agreement check between two LLM results."""
-        try:
-            a_tid = int(a.get("topic_id"))
-            b_tid = int(b.get("topic_id"))
-        except Exception:
+    llm_cfg = state.get("llm_config") or {}
+    allow_rule_fallback = bool(llm_cfg.get("allow_rule_fallback", False))
+
+    def _consistent(a_items: List[dict], b_items: List[dict]) -> bool:
+        """Agreement check between two batch outputs by paper_id/topic/keep."""
+        a_map = {str(item.get("paper_id") or "").strip(): item for item in a_items}
+        b_map = {str(item.get("paper_id") or "").strip(): item for item in b_items}
+        if not a_map or not b_map:
             return False
-        if a_tid != b_tid:
+
+        shared_ids = [pid for pid in a_map if pid and pid in b_map]
+        if len(shared_ids) != len(a_map):
             return False
-        if bool(a.get("keep")) != bool(b.get("keep")):
-            return False
+
+        for pid in shared_ids:
+            a = a_map[pid]
+            b = b_map[pid]
+            try:
+                if int(a.get("topic_id")) != int(b.get("topic_id")):
+                    return False
+            except Exception:
+                return False
+            if bool(a.get("keep")) != bool(b.get("keep")):
+                return False
         return True
 
     def _rule_fallback_for(p: dict, *, reason: str, confidence: float) -> dict:
         """Rule-only fallback decision (keeps secrets out of state/output)."""
         # Rough normalization: rule_score in [0, ~6] -> relevance in [0, 1]
         rule_score = float(p.get("rule_score", 0.0) or 0.0)
+        fallback_summary = _one_sentence_summary(
+            str(p.get("abstract") or "") or str(p.get("title") or "")
+        )
         return {
             "paper_id": p.get("arxiv_id"),
             "topic_id": p.get("rule_topic_id"),
@@ -230,10 +328,13 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
             "keep": bool(rule_score >= 2.0),
             "reason": reason,
             "confidence": confidence,
+            "one_sentence_summary": fallback_summary,
         }
 
     if not state.get("llm_enabled", True):
-        # Fallback: use rule scores only.
+        if not allow_rule_fallback:
+            raise RuntimeError("LLM is required for daily pipeline scoring (llm_enabled=false)")
+
         scored: List[dict] = []
         for p in papers:
             p2 = dict(p)
@@ -247,14 +348,15 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
             scored.append(p2)
         return {"scored_papers": scored}
 
-    llm_cfg = state.get("llm_config") or {}
     rubric_text = state.get("rubric_text") or DEFAULT_INTEREST_RUBRIC_TEXT
 
     try:
         llm_primary = _build_llm(llm_cfg, task="score")
     except Exception as exc:
+        if not allow_rule_fallback:
+            raise RuntimeError(f"Failed to initialize LLM: {exc}") from exc
+
         logger.warning("LLM disabled due to config error: %s", exc)
-        # Graceful fallback: proceed with rule-only scoring.
         scored: List[dict] = []
         for p in papers:
             p2 = dict(p)
@@ -284,8 +386,13 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
 
     llm_scope = (llm_cfg.get("scope") or llm_cfg.get("mode") or "all").strip().lower()
     if llm_scope in {"ambiguous", "ambiguous_only", "ambiguous-only"}:
-        to_llm = [p for p in papers if p.get("rule_ambiguous")]
-        fallback_only = [p for p in papers if not p.get("rule_ambiguous")]
+        if allow_rule_fallback:
+            to_llm = [p for p in papers if p.get("rule_ambiguous")]
+            fallback_only = [p for p in papers if not p.get("rule_ambiguous")]
+        else:
+            logger.info("LLM strict mode active: ignoring ambiguous_only scope and scoring all recalled papers")
+            to_llm = list(papers)
+            fallback_only = []
     else:
         to_llm = list(papers)
         fallback_only = []
@@ -309,11 +416,11 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
         )
 
     batch_size = int(llm_cfg.get("batch_size") or 15)
+    parallel_workers = max(1, int(llm_cfg.get("parallel_workers") or 1))
 
-    for batch in _chunk(to_llm, batch_size):
-        # Build compact inputs (include all arXiv fields we have + rule hints).
+    def _build_batch_inputs(batch_papers: List[dict]) -> List[dict]:
         inputs: List[dict] = []
-        for p in batch:
+        for p in batch_papers:
             inputs.append(
                 {
                     "paper_id": p.get("arxiv_id"),
@@ -333,54 +440,96 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
                     "recall_hits": (p.get("recall_hits") or [])[:10],
                 }
             )
+        return inputs
 
+    def _invoke_with_retries(model: Any, batch_json: str, retries: int) -> List[dict]:
+        parsed: Optional[List[dict]] = None
+        last_error: Optional[Exception] = None
+        for _ in range(retries + 1):
+            try:
+                msg = (prompt | model).invoke({"papers_json": batch_json})
+                parsed = _parse_json_array_from_llm(getattr(msg, "content", "") or "")
+                break
+            except Exception as exc:
+                last_error = exc
+        if parsed is None:
+            raise last_error or ValueError("LLM returned no parsable output")
+        return parsed
+
+    def _run_one_batch(batch: List[dict]) -> Dict[str, dict]:
         try:
-            msg = (prompt | llm_primary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
-            content = _strip_code_fences(getattr(msg, "content", "") or "")
-            parsed_primary = json.loads(content)
-            if not isinstance(parsed_primary, list):
-                raise ValueError("LLM output is not a JSON array")
+            inputs = _build_batch_inputs(batch)
+            batch_json = json.dumps(inputs, ensure_ascii=False)
+            retries = max(0, int(llm_cfg.get("batch_retries") or 1))
 
+            parsed_primary = _invoke_with_retries(llm_primary, batch_json, retries)
             parsed_final = parsed_primary
+
             if llm_secondary is not None:
                 try:
-                    msg2 = (prompt | llm_secondary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
-                    content2 = _strip_code_fences(getattr(msg2, "content", "") or "")
-                    parsed_secondary = json.loads(content2)
-                    if not isinstance(parsed_secondary, list):
-                        raise ValueError("Secondary LLM output is not a JSON array")
-                    if parsed_primary and parsed_secondary and not _consistent(parsed_primary[0], parsed_secondary[0]):
-                        # Tie-break: rerun primary once and trust it as the final output.
-                        msg3 = (prompt | llm_primary).invoke({"papers_json": json.dumps(inputs, ensure_ascii=False)})
-                        content3 = _strip_code_fences(getattr(msg3, "content", "") or "")
-                        parsed_rerun = json.loads(content3)
-                        if isinstance(parsed_rerun, list) and parsed_rerun:
+                    parsed_secondary = _invoke_with_retries(llm_secondary, batch_json, 0)
+                    if parsed_primary and parsed_secondary and not _consistent(parsed_primary, parsed_secondary):
+                        parsed_rerun = _invoke_with_retries(llm_primary, batch_json, retries)
+                        if parsed_rerun:
                             parsed_final = parsed_rerun
                 except Exception as exc:
                     # Secondary call is best-effort; keep primary output.
                     logger.warning("LLM vote skipped for batch (secondary error): %s", exc)
 
+            out: Dict[str, dict] = {}
             for item in parsed_final:
                 paper_id = str(item.get("paper_id") or "").strip()
                 if not paper_id:
                     continue
-                results_by_id[paper_id] = item
-        except Exception as exc:
-            logger.warning("LLM batch failed, using rule fallback for batch: %s", exc)
+                out[paper_id] = item
+
             for p in batch:
-                pid = p.get("arxiv_id")
-                results_by_id[str(pid)] = _rule_fallback_for(
+                pid = str(p.get("arxiv_id") or "").strip()
+                if pid and pid not in out:
+                    if not allow_rule_fallback:
+                        raise RuntimeError(f"LLM output missed paper_id={pid}")
+                    out[pid] = _rule_fallback_for(
+                        p,
+                        reason="Fallback (LLM missing paper result): matched keywords + category priors.",
+                        confidence=0.2,
+                    )
+
+            return out
+        except Exception as exc:
+            if not allow_rule_fallback:
+                raise RuntimeError(f"LLM batch failed: {exc}") from exc
+
+            logger.warning("LLM batch failed, using rule fallback for batch: %s", exc)
+            fallback_out: Dict[str, dict] = {}
+            for p in batch:
+                pid = str(p.get("arxiv_id") or "").strip()
+                fallback_out[pid] = _rule_fallback_for(
                     p,
                     reason="Fallback (LLM batch error): matched keywords + category priors.",
                     confidence=0.2,
                 )
+            return fallback_out
+
+    batches = _chunk(to_llm, batch_size)
+    if parallel_workers <= 1 or len(batches) <= 1:
+        for batch in batches:
+            results_by_id.update(_run_one_batch(batch))
+    else:
+        workers = min(parallel_workers, len(batches))
+        logger.info("LLM batching: %s batches with %s parallel workers", len(batches), workers)
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = [executor.submit(_run_one_batch, batch) for batch in batches]
+            for fut in as_completed(futures):
+                results_by_id.update(fut.result())
 
     scored: List[dict] = []
     for p in papers:
         pid = str(p.get("arxiv_id"))
         r = results_by_id.get(pid)
         if not r:
-            # Extremely defensive fallback
+            if not allow_rule_fallback:
+                raise RuntimeError(f"Missing LLM result for paper_id={pid}")
+
             r = _rule_fallback_for(
                 p,
                 reason="Fallback: missing LLM result.",
@@ -412,6 +561,13 @@ def llm_adjudicate_and_score_node(state: DailyState) -> dict:
             p2["confidence"] = float(r.get("confidence", 0.0))
         except Exception:
             p2["confidence"] = 0.0
+
+        summary_text = str(r.get("one_sentence_summary") or "").strip()
+        if not summary_text:
+            summary_text = _one_sentence_summary(
+                p2["reason"] or str(p.get("abstract") or "") or str(p.get("title") or "")
+            )
+        p2["one_sentence_summary"] = summary_text
 
         scored.append(p2)
 
@@ -461,9 +617,15 @@ def select_and_group_node(state: DailyState) -> dict:
                 {
                     "paper_id": p.get("arxiv_id"),
                     "title": p.get("title"),
+                    "abstract": p.get("abstract") or "",
+                    "authors": p.get("authors") or [],
                     "primary_category": p.get("primary_category"),
                     "categories": p.get("categories") or [],
                     "published": p.get("published"),
+                    "updated": p.get("updated"),
+                    "comment": p.get("comment") or "",
+                    "journal_ref": p.get("journal_ref") or "",
+                    "doi": p.get("doi") or "",
                     "entry_url": p.get("entry_url"),
                     "pdf_url": p.get("pdf_url"),
                     "topic_id": tid,
@@ -472,7 +634,9 @@ def select_and_group_node(state: DailyState) -> dict:
                     "relevance": p.get("relevance"),
                     "confidence": p.get("confidence"),
                     "reason": p.get("reason") or "",
+                    "one_sentence_summary": p.get("one_sentence_summary") or "",
                     "recall_hits": (p.get("recall_hits") or [])[:10],
+                    "recall_hit_count": int(p.get("recall_hit_count") or 0),
                 }
             )
 
@@ -491,6 +655,7 @@ def select_and_group_node(state: DailyState) -> dict:
         "timezone": state.get("timezone"),
         "rubric": state.get("rubric_text") or DEFAULT_INTEREST_RUBRIC_TEXT,
         "threshold": threshold,
+        "llm_enabled": bool(state.get("llm_enabled", True)),
         "topics": topics_out,
     }
 

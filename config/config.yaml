@@ -216,6 +216,12 @@ notification:
   # 增强选项
   use_rich_format: true     # 使用富文本格式 (飞书卡片/Telegram Markdown)
   include_abstract: false   # 是否包含论文摘要
+  card_style: magazine      # 飞书卡片风格 (magazine)
+  abstract_preview_chars: 220
+  show_authors: true
+  show_keywords: true
+  show_reason: true
+  show_score_badge: true
 
   feishu:
     webhook_url: ""         # 飞书群机器人 Webhook
@@ -271,20 +277,53 @@ daily:
   # Drop papers with relevance below this threshold (0-1)
   relevance_threshold: 0.55
 
-  # Use LLM for routing+scoring (falls back to rule-only if key is missing)
+  # Use LLM for routing+scoring
   llm_enabled: true
+
+  # Force LLM path. When true, --no-llm is blocked and missing keys fail fast.
+  require_llm: true
+
+  # Keep false for strict LLM-only behavior.
+  # Set true only if you explicitly want rule fallback on LLM failures.
+  allow_rule_fallback: false
 
   # LLM call scope: "all" | "ambiguous_only"
   llm_scope: all
 
   # Batch size for LLM calls
-  llm_batch_size: 1
+  llm_batch_size: 8
+
+  # Parallel workers for batch-level LLM calls (set 1 to disable concurrency)
+  llm_parallel_workers: 3
+
+  # Retry times for invalid/empty LLM JSON output
+  llm_batch_retries: 1
 
   # LLM voting / consistency check:
-  # - Run a second model (vote_model) to sanity-check against DeepSeek.
-  # - If they disagree, re-run DeepSeek once and trust it as the final output.
-  llm_vote_enabled: true
+  # - Run a second model (vote_model) to sanity-check against primary output.
+  # - If they disagree, re-run primary once and trust it as final output.
+  llm_vote_enabled: false
   llm_vote_model: openai/gpt-oss-120b:free
 
   # Also write raw/enriched/routed/scored JSONL files under data/index/<day>/
   save_intermediates: true
+
+
+  # Daily 7-topic card notification (Feishu only for now)
+  notification:
+    enabled: false
+    provider: feishu
+    per_topic: 3
+    include_empty_topics: false
+    include_abstract: true
+    abstract_preview_chars: 0
+    card_style: magazine
+    show_authors: true
+    show_keywords: true
+    show_reason: true
+    show_score_badge: true
+
+    feishu:
+      webhook_url: ""   # 留空时回退到全局 notification.feishu
+      webhook_file: ""
+      secret: ""

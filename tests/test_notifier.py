@@ -10,6 +10,7 @@ from src.notifier import (
     NotificationError,
     build_notifier,
     _format_paper_digest,
+    _format_daily_topics_digest,
 )
 
 
@@ -36,7 +37,7 @@ def _sample_paper(title: str = "Paper Title", score: float = 3.5) -> Paper:
 class TestNotificationHelpers(TestCase):
     def test_format_digest_empty(self):
         message = _format_paper_digest([], 5)
-        self.assertIn("暂无", message)
+        self.assertIn("No papers matched today.", message)
 
     def test_format_digest_limit(self):
         papers = [_sample_paper(title=f"Paper {i}") for i in range(10)]
@@ -103,6 +104,175 @@ class TestFeishuNotifier(TestCase):
 
         payload = mock_post.call_args.kwargs["json"]
         self.assertEqual(payload["msg_type"], "text")
+
+
+class TestDailyTopicCard(TestCase):
+    @patch("src.notifier.requests.post")
+    def test_daily_topic_card_send(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}
+        mock_post.return_value = mock_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="feishu",
+            feishu_webhook="https://example.com/webhook",
+            use_rich_format=True,
+        )
+        notifier = build_notifier(config)
+        grouped_output = {
+            "day": "2026-02-06",
+            "timezone": "Asia/Shanghai",
+            "threshold": 0.55,
+            "llm_enabled": False,
+            "topics": [
+                {
+                    "topic_id": 1,
+                    "topic": "LLM/MLLM",
+                    "count": 1,
+                    "papers": [
+                        {
+                            "paper_id": "2602.12345",
+                            "title": "A Topic Paper",
+                            "abstract": "Abstract snippet",
+                            "authors": ["Alice", "Bob"],
+                            "primary_category": "cs.AI",
+                            "categories": ["cs.AI", "cs.CL"],
+                            "published": "2026-02-06T01:00:00+08:00",
+                            "updated": "2026-02-06T09:00:00+08:00",
+                            "doi": "10.1000/test",
+                            "journal_ref": "arXiv preprint",
+                            "comment": "Code: github.com/example/repo",
+                            "recall_hits": ["llm", "alignment"],
+                            "recall_hit_count": 2,
+                            "relevance": 0.88,
+                            "confidence": 0.73,
+                            "subtopic": "LLM Fundamentals & Alignment",
+                            "reason": "Matches user rubric strongly",
+                            "one_sentence_summary": "This paper proposes a practical method for aligned LLM behavior.",
+                            "entry_url": "https://arxiv.org/abs/2602.12345",
+                            "pdf_url": "https://arxiv.org/pdf/2602.12345",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        notifier.send_daily_topics(grouped_output, per_topic=3, include_empty_topics=True)
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["msg_type"], "interactive")
+        self.assertIn("card", payload)
+        card_text = "\n".join(
+            e.get("text", {}).get("content", "")
+            for e in payload["card"].get("elements", [])
+            if isinstance(e, dict)
+        )
+        self.assertIn("2602.12345", card_text)
+        self.assertIn("**Authors:** Alice, Bob", card_text)
+        self.assertIn("10.1000/test | arXiv preprint | Code: github.com/example/repo", card_text)
+        self.assertIn("**Recall hits (2):** llm, alignment", card_text)
+        self.assertIn("mode `Rule fallback`", card_text)
+        self.assertIn("**1-sentence summary:** This paper proposes a practical method for aligned LLM behavior.", card_text)
+
+
+
+    @patch("src.notifier.requests.post")
+    def test_daily_topic_card_sends_two_cards_for_topic_chunks(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}
+        mock_post.return_value = mock_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="feishu",
+            feishu_webhook="https://example.com/webhook",
+            use_rich_format=True,
+        )
+        notifier = build_notifier(config)
+
+        grouped_output = {
+            "day": "2026-02-06",
+            "timezone": "Asia/Shanghai",
+            "threshold": 0.55,
+            "llm_enabled": True,
+            "topics": [
+                {"topic_id": 1, "topic": "T1", "count": 0, "papers": []},
+                {"topic_id": 2, "topic": "T2", "count": 0, "papers": []},
+                {"topic_id": 3, "topic": "T3", "count": 0, "papers": []},
+                {"topic_id": 4, "topic": "T4", "count": 0, "papers": []},
+                {"topic_id": 5, "topic": "T5", "count": 0, "papers": []},
+                {"topic_id": 6, "topic": "T6", "count": 0, "papers": []},
+                {"topic_id": 7, "topic": "T7", "count": 0, "papers": []},
+            ],
+        }
+
+        notifier.send_daily_topics(grouped_output, per_topic=3, include_empty_topics=True)
+
+        assert mock_post.call_count == 2
+
+    @patch("src.notifier.requests.post")
+    def test_daily_topic_card_fallback_to_text_when_card_too_large(self, mock_post):
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {"code": 0}
+        mock_post.return_value = mock_response
+
+        config = NotificationConfig(
+            enabled=True,
+            provider="feishu",
+            feishu_webhook="https://example.com/webhook",
+            use_rich_format=True,
+        )
+        notifier = build_notifier(config)
+
+        grouped_output = {
+            "day": "2026-02-06",
+            "timezone": "Asia/Shanghai",
+            "topics": [
+                {
+                    "topic_id": 1,
+                    "topic": "LLM/MLLM",
+                    "count": 1,
+                    "papers": [
+                        {
+                            "title": "X" * 500,
+                            "relevance": 0.88,
+                            "confidence": 0.73,
+                            "subtopic": "S" * 400,
+                            "reason": "R" * 4000,
+                            "entry_url": "https://arxiv.org/abs/2602.12345",
+                            "pdf_url": "https://arxiv.org/pdf/2602.12345",
+                        }
+                    ],
+                }
+            ],
+        }
+
+        with patch("src.notifier.FEISHU_CARD_SAFE_BYTES", 100):
+            notifier.send_daily_topics(grouped_output, per_topic=3, include_empty_topics=True)
+
+        payload = mock_post.call_args.kwargs["json"]
+        self.assertEqual(payload["msg_type"], "text")
+
+
+class TestDailyTopicDigest(TestCase):
+    def test_daily_topic_digest_basic(self):
+        grouped_output = {
+            "day": "2026-02-06",
+            "timezone": "Asia/Shanghai",
+            "threshold": 0.55,
+            "topics": [
+                {
+                    "topic": "LLM/MLLM",
+                    "papers": [{"title": "A", "relevance": 0.8, "entry_url": "https://arxiv.org/abs/1"}],
+                }
+            ],
+        }
+        txt = _format_daily_topics_digest(grouped_output, per_topic=1)
+        self.assertIn("LLM/MLLM", txt)
+        self.assertIn("https://arxiv.org/abs/1", txt)
 
 
 class TestTelegramNotifier(TestCase):

@@ -48,6 +48,7 @@ For each paper:
 3) Decide keep=true/false (false means not relevant enough; it will be dropped).
 4) Provide a short reason (<=2 sentences) referencing concrete signals from the paper.
 5) Provide a confidence 0.0-1.0.
+6) Provide one_sentence_summary: one richer English sentence that clearly states problem, method, and key result.
 
 ## Output JSON format
 Return a JSON array with the same order as input:
@@ -59,7 +60,8 @@ Return a JSON array with the same order as input:
     "relevance": 0.0,
     "keep": true,
     "reason": "....",
-    "confidence": 0.0
+    "confidence": 0.0,
+    "one_sentence_summary": "...."
   }}}},
   ...
 ]
@@ -68,4 +70,5 @@ Constraints:
 - Output valid JSON only.
 - Use numbers for topic_id, relevance, confidence.
 - keep must be true/false.
+- one_sentence_summary must be present for every paper, 32-80 words, and should not copy the abstract verbatim.
 """

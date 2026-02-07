@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, List, Literal, Tuple
+from typing import Dict, List, Literal
 
 
 TopicId = Literal[1, 2, 3, 4, 5, 6, 7]
@@ -21,75 +21,75 @@ class TopicDef:
 TOPIC_DEFS: Dict[TopicId, TopicDef] = {
     1: TopicDef(
         topic_id=1,
-        name="LLM/MLLM 基座与统一建模",
+        name="LLM/MLLM Foundations & Unified Modeling",
         subtopics=[
-            "LLM 基础方法与对齐",
-            "MLLM / 多模态（VLM）",
-            "多模态理解与生成统一建模",
+            "LLM Fundamentals & Alignment",
+            "MLLM / Multimodal (VLM)",
+            "Unified Multimodal Understanding & Generation",
         ],
     ),
     2: TopicDef(
         topic_id=2,
-        name="推理与规划",
+        name="Reasoning & Planning",
         subtopics=[
-            "推理（数学/逻辑/程序）",
-            "工具使用与规划（tool-use/planner）",
-            "可靠性与评测（reasoning eval）",
+            "Reasoning (Math/Logic/Code)",
+            "Tool Use & Planning (tool-use/planner)",
+            "Reliability & Evaluation (reasoning eval)",
         ],
     ),
     3: TopicDef(
         topic_id=3,
-        name="Agent 与 RL",
+        name="Agents & RL",
         subtopics=[
-            "Agent 架构（单/多 agent、协作）",
-            "RL for Agents（RLHF/online/long-horizon）",
-            "Agent 评测与可靠性",
+            "Agent Architectures (single/multi-agent, collaboration)",
+            "RL for Agents (RLHF/online/long-horizon)",
+            "Agent Evaluation & Reliability",
         ],
     ),
     4: TopicDef(
         topic_id=4,
-        name="记忆机制与个性化",
+        name="Memory & Personalization",
         subtopics=[
-            "长期记忆（episodic/semantic）",
-            "记忆检索/压缩/遗忘",
-            "个性化/用户建模（personalization as memory）",
+            "Long-term Memory (episodic/semantic)",
+            "Memory Retrieval / Compression / Forgetting",
+            "Personalization / User Modeling (personalization as memory)",
         ],
     ),
     5: TopicDef(
         topic_id=5,
-        name="Agentic Search / Deep Research / AI 搜索",
+        name="Agentic Search / Deep Research / AI Search",
         subtopics=[
-            "检索/IR/RAG（retrieval/rerank）",
-            "Agentic Search（多跳/证据聚合）",
-            "Deep Research 工作流（research agent/报告）",
+            "Retrieval / IR / RAG (retrieval/rerank)",
+            "Agentic Search (multi-hop/evidence aggregation)",
+            "Deep Research Workflow (research agent/report)",
         ],
     ),
     6: TopicDef(
         topic_id=6,
-        name="Technical Report / Survey / 系统性总结",
+        name="Technical Reports / Surveys / Systematic Synthesis",
         subtopics=[
-            "Technical Report / 方法总结",
-            "Survey/Taxonomy/Benchmark",
+            "Technical Reports / Method Summaries",
+            "Survey / Taxonomy / Benchmark",
         ],
     ),
     7: TopicDef(
         topic_id=7,
-        name="HCI + LLM（人机协作）",
+        name="HCI + LLM (Human-AI Collaboration)",
         subtopics=[
-            "协作工作流（co-writing/co-planning）",
-            "交互与可控性（UI/feedback）",
-            "人类在环评测（效率/信任）",
+            "Collaborative Workflows (co-writing/co-planning)",
+            "Interaction & Controllability (UI/feedback)",
+            "Human-in-the-loop Evaluation (efficiency/trust)",
         ],
     ),
 }
 
 
 DEFAULT_INTEREST_RUBRIC_TEXT = (
-    "我的科研兴趣覆盖多个方向，整体聚焦于 LLM 与 MLLM 这一大类问题。"
-    "在此之上，我尤其关注 agent 与强化学习（RL）、记忆机制（memory）、推理（reasoning）、"
-    "technical report / 系统性方法总结，以及多模态理解与生成的统一建模（unified models）。"
-    "同时，我也对 agentic search / deep research / AI 搜索 等方向保持持续兴趣，"
-    "并关注 HCI + LLM 交叉领域中人与模型协作方式的研究。"
+    "My research interests span multiple directions, with a core focus on LLM and MLLM systems. "
+    "Within that scope, I especially care about agents and reinforcement learning (RL), memory mechanisms, reasoning, "
+    "technical reports/systematic method synthesis, and unified multimodal understanding/generation models. "
+    "I also maintain strong interest in agentic search, deep research, and AI search workflows, "
+    "as well as work on human-model collaboration in HCI + LLM settings."
 )
 
 
@@ -106,6 +106,5 @@ def format_topic_options() -> str:
 
 def topic_limits() -> Dict[TopicId, int]:
     """Per-topic output limits."""
-    limits: Dict[TopicId, int] = {1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 5}
+    limits: Dict[TopicId, int] = {1: 3, 2: 3, 3: 3, 4: 3, 5: 3, 6: 3, 7: 3}
     return limits
-

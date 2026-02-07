@@ -1,3 +1,4 @@
+# [Archived] Legacy experiment utility.
 import datetime
 import os
 from pathlib import Path

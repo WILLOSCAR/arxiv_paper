@@ -1,3 +1,5 @@
+"""[Archived] Legacy experiment utility. Not part of the supported workflow."""
+
 """
 GPT-4 (120B) vs DeepSeek R1 思维链对比测试
 
